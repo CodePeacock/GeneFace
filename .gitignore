@@ -11,8 +11,9 @@ deep_3drecon/checkpoints/*
 
 .vscode
 ### Project ignore
-/checkpoints/*
-!/checkpoints/.gitkeep
+# /checkpoints/*
+# !/checkpoints/.gitkeep
+*.zip
 /data/*
 !/data/.gitkeep
 !data/raw/videos/May.mp4
