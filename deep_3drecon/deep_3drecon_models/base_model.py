@@ -194,7 +194,7 @@ class BaseModel(ABC):
         errors_ret = OrderedDict()
         for name in self.loss_names:
             if isinstance(name, str):
-                errors_ret[name] = float(getattr(self, 'loss_' + name))  # float(...) works for both scalar tensor and float number
+                errors_ret[name] = float(getattr(self, f'loss_{name}'))
         return errors_ret
 
     def save_networks(self, epoch):
@@ -206,37 +206,44 @@ class BaseModel(ABC):
         if not os.path.isdir(self.save_dir):
             os.makedirs(self.save_dir)
 
-        save_filename = 'epoch_%s.pth' % (epoch)
+        save_filename = f'epoch_{epoch}.pth'
         save_path = os.path.join(self.save_dir, save_filename)
-        
+
         save_dict = {}
         for name in self.model_names:
             if isinstance(name, str):
                 net = getattr(self, name)
-                if isinstance(net, torch.nn.DataParallel) or isinstance(net,
-                        torch.nn.parallel.DistributedDataParallel):
+                if isinstance(
+                    net,
+                    (
+                        torch.nn.DataParallel,
+                        torch.nn.parallel.DistributedDataParallel,
+                    ),
+                ):
                     net = net.module
                 save_dict[name] = net.state_dict()
-                
+
 
         for i, optim in enumerate(self.optimizers):
             save_dict['opt_%02d'%i] = optim.state_dict()
 
         for i, sched in enumerate(self.schedulers):
             save_dict['sched_%02d'%i] = sched.state_dict()
-        
+
         torch.save(save_dict, save_path)
 
     def __patch_instance_norm_state_dict(self, state_dict, module, keys, i=0):
         """Fix InstanceNorm checkpoints incompatibility (prior to 0.4)"""
         key = keys[i]
         if i + 1 == len(keys):  # at the end, pointing to a parameter/buffer
-            if module.__class__.__name__.startswith('InstanceNorm') and \
-                    (key == 'running_mean' or key == 'running_var'):
+            if module.__class__.__name__.startswith('InstanceNorm') and key in [
+                'running_mean',
+                'running_var',
+            ]:
                 if getattr(module, key) is None:
                     state_dict.pop('.'.join(keys))
             if module.__class__.__name__.startswith('InstanceNorm') and \
-               (key == 'num_batches_tracked'):
+                   (key == 'num_batches_tracked'):
                 state_dict.pop('.'.join(keys))
         else:
             self.__patch_instance_norm_state_dict(state_dict, getattr(module, key), keys, i + 1)
@@ -250,11 +257,11 @@ class BaseModel(ABC):
         if self.opt.isTrain and self.opt.pretrained_name is not None:
             load_dir = os.path.join(self.opt.checkpoints_dir, self.opt.pretrained_name)
         else:
-            load_dir = self.save_dir    
-        load_filename = 'epoch_%s.pth' % (epoch)
+            load_dir = self.save_dir
+        load_filename = f'epoch_{epoch}.pth'
         load_path = os.path.join(load_dir, load_filename)
         state_dict = torch.load(load_path, map_location=self.device)
-        print('loading the model from %s' % load_path)
+        print(f'loading the model from {load_path}')
 
         for name in self.model_names:
             if isinstance(name, str):
@@ -262,20 +269,20 @@ class BaseModel(ABC):
                 if isinstance(net, torch.nn.DataParallel):
                     net = net.module
                 net.load_state_dict(state_dict[name])
-        
+
         if self.opt.phase != 'test':
             if self.opt.continue_train:
-                print('loading the optim from %s' % load_path)
+                print(f'loading the optim from {load_path}')
                 for i, optim in enumerate(self.optimizers):
                     optim.load_state_dict(state_dict['opt_%02d'%i])
 
                 try:
-                    print('loading the sched from %s' % load_path)
+                    print(f'loading the sched from {load_path}')
                     for i, sched in enumerate(self.schedulers):
                         sched.load_state_dict(state_dict['sched_%02d'%i])
                 except:
                     print('Failed to load schedulers, set schedulers according to epoch count manually')
-                    for i, sched in enumerate(self.schedulers):
+                    for sched in self.schedulers:
                         sched.last_epoch = self.opt.epoch_count - 1
                     
 
@@ -291,9 +298,7 @@ class BaseModel(ABC):
         for name in self.model_names:
             if isinstance(name, str):
                 net = getattr(self, name)
-                num_params = 0
-                for param in net.parameters():
-                    num_params += param.numel()
+                num_params = sum(param.numel() for param in net.parameters())
                 if verbose:
                     print(net)
                 print('[Network %s] Total number of parameters : %.3f M' % (name, num_params / 1e6))

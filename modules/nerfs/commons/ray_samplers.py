@@ -79,14 +79,14 @@ class UniformRaySampler(BaseRaySampler):
         if rect is None:
             # uniformly sample the whole image
             select_inds = np.random.choice(coords.shape[0], size=[n_rays], replace=False) # (n_rays, )
-            select_coords = coords[select_inds].long().to(device)
+            return coords[select_inds].long().to(device)
         else:
             # uniformly sample from the rect reigon and out-rect, respectively.
             w1, h1, delta_w, delta_h = rect
             w2 = w1 + delta_w
             h2 = h1 + delta_h
             rect_inds = (coords[:, 0] >= h1) & (coords[:, 0] <= h2) & (coords[:, 1] >= w1) & ( coords[:, 1] <= w2) # (H*W), boolean mask
-            
+
             coords_rect = coords[rect_inds] # [num_idx_in_mask, 2]
             coords_norect = coords[~rect_inds]
             num_rays_in_rect = int(n_rays * in_rect_percent)
@@ -95,8 +95,7 @@ class UniformRaySampler(BaseRaySampler):
             select_coords_rect = coords_rect[select_inds_rect].long() # (num_rays_in_rect, 2)
             select_inds_norect = np.random.choice(coords_norect.shape[0], size=[num_rays_out_rect], replace=False)  # (num_rays_out_rect,)
             select_coords_norect = coords_norect[select_inds_norect].long() # (num_rays_in_rect)
-            select_coords = torch.cat((select_coords_rect, select_coords_norect), dim=0) 
-        return select_coords  # (n_rays, 2)
+            return torch.cat((select_coords_rect, select_coords_norect), dim=0)
     
     def __call__(self, H, W, focal, c2w, n_rays=None, select_coords=None, rect=None, in_rect_percent=0.9, **kwargs):
         rays_o, rays_d = get_rays(H, W, focal, c2w) # [H, W, 3]
@@ -130,13 +129,13 @@ class TorsoUniformRaySampler(BaseRaySampler):
         coords = torch.stack(torch.meshgrid(torch.linspace(0, H-1, H), torch.linspace(0, W-1, W)), -1)  # (H, W, 2)
         coords = torch.reshape(coords, [-1, 2]).to(device)  # (H * W, 2)
         if rect is None:
-            rect = [0, H/2, W, H/2]            
+            rect = [0, H/2, W, H/2]
         # uniformly sample from the rect reigon and out-rect, respectively.
         w1, h1, delta_w, delta_h = rect
         w2 = w1 + delta_w
         h2 = h1 + delta_h
         rect_inds = (coords[:, 0] >= h1) & (coords[:, 0] <= h2) & (coords[:, 1] >= w1) & ( coords[:, 1] <= w2) # (H*W), boolean mask
-        
+
         coords_rect = coords[rect_inds] # [num_idx_in_mask, 2]
         coords_norect = coords[~rect_inds]
         num_rays_in_rect = int(n_rays * in_rect_percent)
@@ -145,9 +144,7 @@ class TorsoUniformRaySampler(BaseRaySampler):
         select_coords_rect = coords_rect[select_inds_rect].long() # (num_rays_in_rect, 2)
         select_inds_norect = np.random.choice(coords_norect.shape[0], size=[num_rays_out_rect], replace=False)  # (num_rays_out_rect,)
         select_coords_norect = coords_norect[select_inds_norect].long() # (num_rays_in_rect)
-        select_coords = torch.cat((select_coords_rect, select_coords_norect), dim=0) 
-
-        return select_coords  # (n_rays, 2)
+        return torch.cat((select_coords_rect, select_coords_norect), dim=0)
     
     def __call__(self, H, W, focal, c2w, n_rays=None, select_coords=None, rect=None, in_rect_percent=0.9, **kwargs):
         rays_o, rays_d = get_rays(H, W, focal, c2w) # [H, W, 3]
@@ -178,8 +175,7 @@ class FullRaySampler(BaseRaySampler):
         h, w = torch.meshgrid([torch.linspace(0,H-1,num_h_points), torch.linspace(0,W-1,num_w_points)])
         h = h.reshape([-1,1]).long()
         w = w.reshape([-1,1]).long()
-        select_coords = torch.cat([h, w], dim=-1)# (n_rays, 2)
-        return select_coords
+        return torch.cat([h, w], dim=-1)
 
     def __call__(self, H, W, focal, c2w):
         rays_o, rays_d = get_rays(H, W, focal, c2w)
@@ -241,7 +237,7 @@ class PatchRaySampler(BaseRaySampler):
         scale_factor = torch.Tensor(1).uniform_(min_scale, self.max_scale)
         w = unit_w * scale_factor
         h = unit_h * scale_factor
-        
+
         if rect is None:
             max_offset_w = 1-scale_factor.item()
             max_offset_h = 1-scale_factor.item()
@@ -262,9 +258,7 @@ class PatchRaySampler(BaseRaySampler):
             w_offset = torch.Tensor(1).uniform_(min_offset_w, max_offset_w)
         h += h_offset
         w += w_offset
-        hw = torch.cat([h,w], dim=2) # [H, W, 2], it is necessary to keep the H,W axis for grid_sampling
-        select_coords = hw
-        return select_coords
+        return torch.cat([h,w], dim=2)
 
     def __call__(self, H, W, focal, c2w, iterations, n_rays=None, rect=None, **kwargs):
         rays_o, rays_d = get_rays(H, W, focal, c2w)

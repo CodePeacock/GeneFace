@@ -47,7 +47,7 @@ def main(rank, opt, name='examples'):
         print(i, im_path[i])
         img_name = im_path[i].split(os.path.sep)[-1].replace('.png','').replace('.jpg','')
         if not os.path.isfile(lm_path[i]):
-            print("%s is not found !!!"%lm_path[i])
+            print(f"{lm_path[i]} is not found !!!")
             continue
         im_tensor, lm_tensor = read_data(im_path[i], lm_path[i], lm3d_std)
         data = {
@@ -60,10 +60,24 @@ def main(rank, opt, name='examples'):
         visualizer.display_current_results(visuals, 0, opt.epoch, dataset=name.split(os.path.sep)[-1], 
             save_results=True, count=i, name=img_name, add_image=False)
 
-        model.save_mesh(os.path.join(visualizer.img_dir, name.split(os.path.sep)[-1], 'epoch_%s_%06d'%(opt.epoch, 0),img_name+'.obj')) # save reconstruction meshes
-        model.save_coeff(os.path.join(visualizer.img_dir, name.split(os.path.sep)[-1], 'epoch_%s_%06d'%(opt.epoch, 0),img_name+'.mat')) # save predicted coefficients
+        model.save_mesh(
+            os.path.join(
+                visualizer.img_dir,
+                name.split(os.path.sep)[-1],
+                'epoch_%s_%06d' % (opt.epoch, 0),
+                f'{img_name}.obj',
+            )
+        )
+        model.save_coeff(
+            os.path.join(
+                visualizer.img_dir,
+                name.split(os.path.sep)[-1],
+                'epoch_%s_%06d' % (opt.epoch, 0),
+                f'{img_name}.mat',
+            )
+        )
 
 if __name__ == '__main__':
     opt = TestOptions().parse()  # get test options
     main(0, opt, 'deep_3drecon/datasets/examples')
-    print(f"results saved at deep_3drecon/checkpoints/facerecon/results/")    
+    print("results saved at deep_3drecon/checkpoints/facerecon/results/")    

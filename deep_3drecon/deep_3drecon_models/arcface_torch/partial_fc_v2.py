@@ -163,8 +163,7 @@ class PartialFC_V2(torch.nn.Module):
         logits = logits.clamp(-1, 1)
 
         logits = self.margin_softmax(logits, labels)
-        loss = self.dist_cross_entropy(logits, labels)
-        return loss
+        return self.dist_cross_entropy(logits, labels)
 
 
 class DistCrossEntropyFunc(torch.autograd.Function):

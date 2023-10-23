@@ -31,15 +31,14 @@ class Face3DHelper:
         """
         coeff: Tensor[B, T, c=257] or [T, c=257]
         """
-        ret_dict = {
-            'identity': coeff[..., :80],  # identity, [b, t, c=80] 
+        return {
+            'identity': coeff[..., :80],  # identity, [b, t, c=80]
             'expression': coeff[..., 80:144],  # expression, [b, t, c=80]
             'texture': coeff[..., 144:224],  # texture, [b, t, c=80]
             'angles': coeff[..., 224:227],  # euler angles for pose, [b, t, c=3]
-            'translation':  coeff[..., 254:257], # translation, [b, t, c=3]
-            'gamma': coeff[..., 227:254] # lighting, [b, t, c=27]
+            'translation': coeff[..., 254:257],  # translation, [b, t, c=3]
+            'gamma': coeff[..., 227:254],  # lighting, [b, t, c=27]
         }
-        return ret_dict
     
     def reconstruct_face_mesh(self, id_coeff, exp_coeff):
         """
@@ -53,13 +52,12 @@ class Face3DHelper:
         id_base, exp_base = self.id_base, self.exp_base # [3*N, C]
         identity_diff_face = torch.matmul(id_coeff, id_base.transpose(0,1)) # [t,c],[c,3N] ==> [t,3N]
         expression_diff_face = torch.matmul(exp_coeff, exp_base.transpose(0,1)) # [t,c],[c,3N] ==> [t,3N]
-        
+
         face = mean_face + identity_diff_face + expression_diff_face # [t,3N]
         face = face.reshape([face.shape[0], -1, 3]) # [t,N,3]
         # re-centering the face with mean_xyz, so the face will be in [-1, 1]
         mean_xyz = self.mean_shape.squeeze().reshape([-1,3]).mean(dim=0) # [1, 3]
-        face_mesh = face - mean_xyz.unsqueeze(0) # [t,N,3]
-        return face_mesh
+        return face - mean_xyz.unsqueeze(0)
 
     def reconstruct_lm3d(self, id_coeff, exp_coeff):
         """
@@ -73,13 +71,12 @@ class Face3DHelper:
         id_base, exp_base = self.key_id_base, self.key_exp_base # [3*68, C]
         identity_diff_face = torch.matmul(id_coeff, id_base.transpose(0,1)) # [t,c],[c,3*68] ==> [t,3*68]
         expression_diff_face = torch.matmul(exp_coeff, exp_base.transpose(0,1)) # [t,c],[c,3*68] ==> [t,3*68]
-        
+
         face = mean_face + identity_diff_face + expression_diff_face # [t,3N]
         face = face.reshape([face.shape[0], -1, 3]) # [t,N,3]
         # re-centering the face with mean_xyz, so the face will be in [-1, 1]
         mean_xyz = self.key_mean_shape.squeeze().reshape([-1,3]).mean(dim=0) # [1, 3]
-        lm3d = face - mean_xyz.unsqueeze(0) # [t,N,3]
-        return lm3d
+        return face - mean_xyz.unsqueeze(0)
 
     def reconstruct_idexp_lm3d(self, id_coeff, exp_coeff):
         """
@@ -92,11 +89,10 @@ class Face3DHelper:
         id_base, exp_base = self.key_id_base, self.key_exp_base # [3*68, C]
         identity_diff_face = torch.matmul(id_coeff, id_base.transpose(0,1)) # [t,c],[c,3*68] ==> [t,3*68]
         expression_diff_face = torch.matmul(exp_coeff, exp_base.transpose(0,1)) # [t,c],[c,3*68] ==> [t,3*68]
-        
+
         face = identity_diff_face + expression_diff_face # [t,3N]
         face = face.reshape([face.shape[0], -1, 3]) # [t,N,3]
-        lm3d = face * 10
-        return lm3d
+        return face * 10
     
     def get_eye_mouth_lm_from_lm3d(self, lm3d):
         eye_lm = lm3d[:, 17:48] # [T, 31, 3]
@@ -116,16 +112,14 @@ class Face3DHelper:
         assert identity.ndim == 1 and exp_arr.ndim == 2
         T = exp_arr.shape[0]
         identity = identity[None, :].repeat([T, 1])
-        lm3d = self.reconstruct_lm3d(identity, exp_arr)
-        return lm3d
+        return self.reconstruct_lm3d(identity, exp_arr)
     
     def get_lm3d_from_coeff_seq(self, coeff_arr):
         """
         coeff_arr: [T, 257]
         """
         ret_dict = self.split_coeff(coeff_arr)
-        lm3d = self.reconstruct_lm3d(ret_dict['identity'], ret_dict['expression'])
-        return lm3d
+        return self.reconstruct_lm3d(ret_dict['identity'], ret_dict['expression'])
     def close_mouth_for_idexp_lm3d(self, idexp_lm3d, freeze_as_first_frame=True):
         idexp_lm3d = idexp_lm3d.reshape([-1, 68,3])
         num_frames = idexp_lm3d.shape[0]

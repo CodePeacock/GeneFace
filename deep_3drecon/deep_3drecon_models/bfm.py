@@ -167,8 +167,7 @@ class ParametricFaceModel:
         r = Y @ gamma[..., :1]
         g = Y @ gamma[..., 1:2]
         b = Y @ gamma[..., 2:]
-        face_color = torch.cat([r, g, b], dim=-1) * face_texture
-        return face_color
+        return torch.cat([r, g, b], dim=-1) * face_texture
 
     
     def compute_rotation(self, angles):

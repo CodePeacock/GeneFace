@@ -11,24 +11,24 @@ def extract_audio(path, out_path, sample_rate=16000):
     print(f'[INFO] ===== extract audio from {path} to {out_path} =====')
     cmd = f'ffmpeg -i {path} -f wav -ar {sample_rate} {out_path}'
     os.system(cmd)
-    print(f'[INFO] ===== extracted audio =====')
+    print('[INFO] ===== extracted audio =====')
 
 
 def extract_audio_features(path):
 
     print(f'[INFO] ===== extract audio labels for {path} =====')
 
-    print(f'[INFO] ===== start extract esperanto =====')
+    print('[INFO] ===== start extract esperanto =====')
     cmd = f'python data_util/extract_esperanto.py --wav {path} --save_feats'
     os.system(cmd)
-    print(f'[INFO] ===== extracted esperanto =====')
+    print('[INFO] ===== extracted esperanto =====')
 
-    print(f'[INFO] ===== extract deepspeech =====')
+    print('[INFO] ===== extract deepspeech =====')
     cmd = f'python data_util/deepspeech_features/extract_ds_features.py --input {path} --output {path.replace(".wav", "_deepspeech.npy")}'
     os.system(cmd)
-    print(f'[INFO] ===== extracted deepspeech =====')
+    print('[INFO] ===== extracted deepspeech =====')
 
-    print(f'[INFO] ===== extracted all audio labels =====')
+    print('[INFO] ===== extracted all audio labels =====')
 
 
 def extract_images(path, out_path, fps=25):
@@ -36,7 +36,7 @@ def extract_images(path, out_path, fps=25):
     print(f'[INFO] ===== extract images from {path} to {out_path} =====')
     cmd = f'ffmpeg -i {path} -vf fps={fps} -qmin 1 -q:v 1 -start_number 0 {os.path.join(out_path, "%d.jpg")}'
     os.system(cmd)
-    print(f'[INFO] ===== extracted images =====')
+    print('[INFO] ===== extracted images =====')
 
 
 def extract_semantics(ori_imgs_dir, parsing_dir):
@@ -44,7 +44,7 @@ def extract_semantics(ori_imgs_dir, parsing_dir):
     print(f'[INFO] ===== extract semantics from {ori_imgs_dir} to {parsing_dir} =====')
     cmd = f'python data_util/face_parsing/test.py --respath={parsing_dir} --imgpath={ori_imgs_dir}'
     os.system(cmd)
-    print(f'[INFO] ===== extracted semantics =====')
+    print('[INFO] ===== extracted semantics =====')
 
 
 def extract_landmarks(ori_imgs_dir):
@@ -62,7 +62,7 @@ def extract_landmarks(ori_imgs_dir):
             lands = preds[0].reshape(-1, 2)[:,:2]
             np.savetxt(image_path.replace('jpg', 'lms'), lands, '%f')
     del fa
-    print(f'[INFO] ===== extracted face landmarks =====')
+    print('[INFO] ===== extracted face landmarks =====')
 
 
 def extract_background(base_dir, ori_imgs_dir):
@@ -119,13 +119,13 @@ def extract_background(base_dir, ori_imgs_dir):
 
     cv2.imwrite(os.path.join(base_dir, 'bc.jpg'), bg_img)
 
-    print(f'[INFO] ===== extracted background image =====')
+    print('[INFO] ===== extracted background image =====')
 
 def extract_head(base_dir):
     bg_img = cv2.imread(os.path.join(base_dir, 'bc.jpg'), cv2.IMREAD_UNCHANGED)
     ori_imgs_dir = os.path.join(base_dir, 'ori_imgs')
     image_paths = glob.glob(os.path.join(ori_imgs_dir, '*.jpg'))
-    
+
     print(f'[INFO] ===== extract head images for {base_dir} =====')
 
     for image_path in tqdm.tqdm(image_paths):    
@@ -139,7 +139,7 @@ def extract_head(base_dir):
             parsing_img[:, :, 1] == 0) & (parsing_img[:, :, 2] == 0)
         img[~head_part] = bg_img[~head_part]
         cv2.imwrite(image_path.replace('ori_imgs', 'head_imgs'), img)
-    print(f'[INFO] ===== extracted head images =====')
+    print('[INFO] ===== extracted head images =====')
 
 
 def extract_torso_and_gt(base_dir, ori_imgs_dir):
@@ -150,9 +150,11 @@ def extract_torso_and_gt(base_dir, ori_imgs_dir):
 
     # load bg
     bg_image = cv2.imread(os.path.join(base_dir, 'bc.jpg'), cv2.IMREAD_UNCHANGED)
-    
+
     image_paths = glob.glob(os.path.join(ori_imgs_dir, '*.jpg'))
 
+    # neck part "vertical" in-painting...
+    push_down = 4
     for image_path in tqdm.tqdm(image_paths):
         # read ori image
         ori_image = cv2.imread(image_path, cv2.IMREAD_UNCHANGED) # [H, W, 3]
@@ -173,7 +175,7 @@ def extract_torso_and_gt(base_dir, ori_imgs_dir):
         torso_image = gt_image.copy() # rgb
         torso_image[head_part] = bg_image[head_part]
         torso_alpha = 255 * np.ones((gt_image.shape[0], gt_image.shape[1], 1), dtype=np.uint8) # alpha
-        
+
         # torso part "vertical" in-painting...
         L = 8 + 1
         torso_coords = np.stack(np.nonzero(torso_part), axis=-1) # [M, 2]
@@ -186,7 +188,7 @@ def extract_torso_and_gt(base_dir, ori_imgs_dir):
         top_torso_coords = torso_coords[uid] # [m, 2]
         # only keep top-is-head pixels
         top_torso_coords_up = top_torso_coords.copy() - np.array([1, 0])
-        mask = head_part[tuple(top_torso_coords_up.T)] 
+        mask = head_part[tuple(top_torso_coords_up.T)]
         if mask.any():
             top_torso_coords = top_torso_coords[mask]
             # get the color
@@ -206,10 +208,8 @@ def extract_torso_and_gt(base_dir, ori_imgs_dir):
             inpaint_torso_mask[tuple(inpaint_torso_coords.T)] = True
         else:
             inpaint_torso_mask = None
-            
 
-        # neck part "vertical" in-painting...
-        push_down = 4
+
         L = 48 + push_down + 1
 
         neck_part = binary_dilation(neck_part, structure=np.array([[0, 1, 0], [0, 1, 0], [0, 1, 0]], dtype=bool), iterations=3)
@@ -225,7 +225,7 @@ def extract_torso_and_gt(base_dir, ori_imgs_dir):
         # only keep top-is-head pixels
         top_neck_coords_up = top_neck_coords.copy() - np.array([1, 0])
         mask = head_part[tuple(top_neck_coords_up.T)] 
-        
+
         top_neck_coords = top_neck_coords[mask]
         # push these top down for 4 pixels to make the neck inpainting more natural...
         offset_down = np.minimum(ucnt[mask] - 1, push_down)
@@ -261,12 +261,12 @@ def extract_torso_and_gt(base_dir, ori_imgs_dir):
 
         cv2.imwrite(image_path.replace('ori_imgs', 'torso_imgs').replace('.jpg', '.png'), np.concatenate([torso_image, torso_alpha], axis=-1))
 
-    print(f'[INFO] ===== extracted torso and gt images =====')
+    print('[INFO] ===== extracted torso and gt images =====')
 
 
 def face_tracking(video_id, ori_imgs_dir):
 
-    print(f'[INFO] ===== perform face tracking =====')
+    print('[INFO] ===== perform face tracking =====')
 
     image_paths = glob.glob(os.path.join(ori_imgs_dir, '*.jpg'))
     # read one image to get H/W
@@ -277,16 +277,16 @@ def face_tracking(video_id, ori_imgs_dir):
 
     os.system(cmd)
 
-    print(f'[INFO] ===== finished face tracking =====')
+    print('[INFO] ===== finished face tracking =====')
 
 
 def save_transforms(base_dir, ori_imgs_dir):
-    print(f'[INFO] ===== save transforms =====')
+    print('[INFO] ===== save transforms =====')
 
     import torch
 
     image_paths = glob.glob(os.path.join(ori_imgs_dir, '*.jpg'))
-    
+
     # read one image to get H/W
     tmp_image = cv2.imread(image_paths[0], cv2.IMREAD_UNCHANGED) # [H, W, 3]
     h, w = tmp_image.shape[:2]
@@ -358,7 +358,7 @@ def save_transforms(base_dir, ori_imgs_dir):
 
             frame_dict['transform_matrix'] = pose.numpy().tolist()
 
-            lms = np.loadtxt(os.path.join(ori_imgs_dir, str(i) + '.lms'))
+            lms = np.loadtxt(os.path.join(ori_imgs_dir, f'{str(i)}.lms'))
             min_x, max_x = np.min(lms, 0)[0], np.max(lms, 0)[0]
             cx = int((min_x+max_x)/2.0)
             cy = int(lms[27, 1])
@@ -374,13 +374,13 @@ def save_transforms(base_dir, ori_imgs_dir):
             rect_h = min(h-1-rect_y, 2*h_h)
             rect = np.array((rect_x, rect_y, rect_w, rect_h), dtype=np.int32)
             frame_dict['face_rect'] = rect.tolist()
-            
+
             transform_dict['frames'].append(frame_dict)
 
-        with open(os.path.join(base_dir, 'transforms_' + save_id + '.json'), 'w') as fp:
+        with open(os.path.join(base_dir, f'transforms_{save_id}.json'), 'w') as fp:
             json.dump(transform_dict, fp, indent=2, separators=(',', ': '))
 
-    print(f'[INFO] ===== finished saving transforms =====')
+    print('[INFO] ===== finished saving transforms =====')
 
 
 if __name__ == '__main__':
@@ -409,39 +409,39 @@ if __name__ == '__main__':
 
 
     # extract audio
-    if opt.task == -1 or opt.task == 1:
+    if opt.task in [-1, 1]:
         extract_audio(video_path, wav_path)
 
     # extract audio features
-    if opt.task == -1 or opt.task == 2:
+    if opt.task in [-1, 2]:
         extract_audio_features(wav_path)
 
     # extract images
-    if opt.task == -1 or opt.task == 3:
+    if opt.task in [-1, 3]:
         extract_images(video_path, ori_imgs_dir)
 
     # face parsing
-    if opt.task == -1 or opt.task == 4:
+    if opt.task in [-1, 4]:
         extract_semantics(ori_imgs_dir, parsing_dir)
 
     # extract bg
-    if opt.task == -1 or opt.task == 5:
+    if opt.task in [-1, 5]:
         extract_background(processed_dir, ori_imgs_dir)
 
     # extract torso images and gt_images
-    if opt.task == -1 or opt.task == 6:
+    if opt.task in [-1, 6]:
         extract_head(processed_dir)
         extract_torso_and_gt(processed_dir, ori_imgs_dir)
 
     # extract face landmarks
-    if opt.task == -1 or opt.task == 7:
+    if opt.task in [-1, 7]:
         extract_landmarks(ori_imgs_dir)
 
     # face tracking
-    if opt.task == -1 or opt.task == 8:
+    if opt.task in [-1, 8]:
         face_tracking(video_id, ori_imgs_dir)
 
     # save transforms.json
-    if opt.task == -1 or opt.task == 9:
+    if opt.task in [-1, 9]:
         save_transforms(processed_dir, ori_imgs_dir)
 

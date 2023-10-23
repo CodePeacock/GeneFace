@@ -20,11 +20,10 @@ class PolyScheduler(_LRScheduler):
             return [self.warmup_lr_init for _ in self.optimizer.param_groups]
         if self.last_epoch < self.warmup_steps:
             return self.get_warmup_lr()
-        else:
-            alpha = pow(
-                1
-                - float(self.last_epoch - self.warmup_steps)
-                / float(self.max_steps - self.warmup_steps),
-                self.power,
-            )
-            return [self.base_lr * alpha for _ in self.optimizer.param_groups]
+        alpha = pow(
+            1
+            - float(self.last_epoch - self.warmup_steps)
+            / float(self.max_steps - self.warmup_steps),
+            self.power,
+        )
+        return [self.base_lr * alpha for _ in self.optimizer.param_groups]

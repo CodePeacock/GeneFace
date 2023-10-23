@@ -71,10 +71,9 @@ class SoftSimpleShader(nn.Module):
             raise ValueError(msg)
         znear = kwargs.get("znear", getattr(cameras, "znear", 1.0))
         zfar = kwargs.get("zfar", getattr(cameras, "zfar", 100.0))
-        images = softmax_rgb_blend(
+        return softmax_rgb_blend(
             texels, fragments, blend_params, znear=znear, zfar=zfar
         )
-        return images
 
 
 class Render_3DMM(nn.Module):
@@ -101,8 +100,7 @@ class Render_3DMM(nn.Module):
         nnorm = torch.cross(vert_2-vert_1, vert_3-vert_1, 2)
         tri_normal = nn.functional.normalize(nnorm, dim=2)
         v_norm = tri_normal[:, self.vert_tris, :].sum(2)
-        vert_normal = v_norm / v_norm.norm(dim=2).unsqueeze(2)
-        return vert_normal
+        return v_norm / v_norm.norm(dim=2).unsqueeze(2)
 
     def get_render(self, batch_size=1):
         half_s = self.img_w * 0.5
@@ -163,15 +161,16 @@ class Render_3DMM(nn.Module):
         Y0 = torch.ones(n_v_full).to(gamma.device).float() * a0 * c0
         norm = norm.view(-1, 3)
         nx, ny, nz = norm[:, 0], norm[:, 1], norm[:, 2]
-        arrH = []
+        arrH = [
+            Y0,
+            -a1 * c1 * ny,
+            a1 * c1 * nz,
+            -a1 * c1 * nx,
+            a2 * c2 * nx * ny,
+            -a2 * c2 * ny * nz,
+            a2 * c2 * d0 * (3 * nz.pow(2) - 1),
+        ]
 
-        arrH.append(Y0)
-        arrH.append(-a1 * c1 * ny)
-        arrH.append(a1 * c1 * nz)
-        arrH.append(-a1 * c1 * nx)
-        arrH.append(a2 * c2 * nx * ny)
-        arrH.append(-a2 * c2 * ny * nz)
-        arrH.append(a2 * c2 * d0 * (3 * nz.pow(2) - 1))
         arrH.append(-a2 * c2 * nx * nz)
         arrH.append(a2 * c2 * 0.5 * (nx.pow(2) - ny.pow(2)))
 
@@ -179,8 +178,7 @@ class Render_3DMM(nn.Module):
         Y = H.view(n_b, num_vertex, 9)
         lighting = Y.bmm(gamma)
 
-        face_color = face_texture * lighting
-        return face_color
+        return face_texture * lighting
 
     def forward(self, rott_geometry, texture, diffuse_sh):
         face_normal = self.compute_normal(rott_geometry)

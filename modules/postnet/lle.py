@@ -23,9 +23,7 @@ def find_k_nearest_neighbors(feats, feat_database, K=10):
     feats_norm = (feats ** 2).sum(-1) # [N_sample_in_batch,]
     # calculate distance via : (x-y)^2  = x^2 + y^2 - 2xy
     distance_mat = (feats_norm.view(-1, 1) + feat_base_norm.view(1, -1) - 2 * feats @ feat_database.t()) # [N_sample_in_batch, N_sample_in_database]
-    # get the index of k nearest neighbors
-    ind = distance_mat.topk(K, dim=1, largest=False).indices
-    return ind
+    return distance_mat.topk(K, dim=1, largest=False).indices
 
 def solve_LLE_projection_batch(feat, feat_base):
     """

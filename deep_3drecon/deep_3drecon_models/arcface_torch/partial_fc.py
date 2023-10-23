@@ -174,9 +174,9 @@ class PartialFC(torch.nn.Module):
         batch_size = local_embeddings.size(0)
         if self.last_batch_size == 0:
             self.last_batch_size = batch_size
-        assert self.last_batch_size == batch_size, (
-            "last batch size do not equal current batch size: {} vs {}".format(
-            self.last_batch_size, batch_size))
+        assert (
+            self.last_batch_size == batch_size
+        ), f"last batch size do not equal current batch size: {self.last_batch_size} vs {batch_size}"
 
         _gather_embeddings = [
             torch.zeros((batch_size, self.embedding_size)).cuda()
@@ -210,8 +210,7 @@ class PartialFC(torch.nn.Module):
         logits = logits.clamp(-1, 1)
 
         logits = self.margin_softmax(logits, labels)
-        loss = self.dist_cross_entropy(logits, labels)
-        return loss
+        return self.dist_cross_entropy(logits, labels)
 
     def state_dict(self, destination=None, prefix="", keep_vars=False):
         if destination is None: 
@@ -374,9 +373,9 @@ class PartialFCAdamW(torch.nn.Module):
         batch_size = local_embeddings.size(0)
         if self.last_batch_size == 0:
             self.last_batch_size = batch_size
-        assert self.last_batch_size == batch_size, (
-            "last batch size do not equal current batch size: {} vs {}".format(
-            self.last_batch_size, batch_size))
+        assert (
+            self.last_batch_size == batch_size
+        ), f"last batch size do not equal current batch size: {self.last_batch_size} vs {batch_size}"
 
         _gather_embeddings = [
             torch.zeros((batch_size, self.embedding_size)).cuda()
@@ -410,8 +409,7 @@ class PartialFCAdamW(torch.nn.Module):
         logits = logits.clamp(-1, 1)
 
         logits = self.margin_softmax(logits, labels)
-        loss = self.dist_cross_entropy(logits, labels)
-        return loss
+        return self.dist_cross_entropy(logits, labels)
     def state_dict(self, destination=None, prefix="", keep_vars=False):
         if destination is None: 
             destination = collections.OrderedDict()

@@ -38,12 +38,12 @@ def get_deepspeech_model_file(local_model_store_dir_path=os.path.join("~", ".ten
         else:
             logging.warning("Mismatch in the content of model file detected. Downloading again.")
     else:
-        logging.info("Model file not found. Downloading to {}.".format(file_path))
+        logging.info(f"Model file not found. Downloading to {file_path}.")
 
     if not os.path.exists(local_model_store_dir_path):
         os.makedirs(local_model_store_dir_path)
 
-    zip_file_path = file_path + ".zip"
+    zip_file_path = f"{file_path}.zip"
     _download(
         url="{repo_url}/releases/download/{repo_release_tag}/{file_name}.zip".format(
             repo_url=deepspeech_features_repo_url,
@@ -101,10 +101,7 @@ def _download(url, path=None, overwrite=False, sha1_hash=None, retries=5, verify
         assert fname, "Can't construct file-name from this URL. Please set the `path` option manually."
     else:
         path = os.path.expanduser(path)
-        if os.path.isdir(path):
-            fname = os.path.join(path, url.split("/")[-1])
-        else:
-            fname = path
+        fname = os.path.join(path, url.split("/")[-1]) if os.path.isdir(path) else path
     assert retries >= 0, "Number of retries should be at least 0"
 
     if not verify_ssl:
@@ -116,31 +113,31 @@ def _download(url, path=None, overwrite=False, sha1_hash=None, retries=5, verify
         dirname = os.path.dirname(os.path.abspath(os.path.expanduser(fname)))
         if not os.path.exists(dirname):
             os.makedirs(dirname)
-        while retries + 1 > 0:
+        while retries > -1:
             # Disable pyling too broad Exception
             # pylint: disable=W0703
             try:
-                print("Downloading {} from {}...".format(fname, url))
+                print(f"Downloading {fname} from {url}...")
                 r = requests.get(url, stream=True, verify=verify_ssl)
                 if r.status_code != 200:
-                    raise RuntimeError("Failed downloading url {}".format(url))
+                    raise RuntimeError(f"Failed downloading url {url}")
                 with open(fname, "wb") as f:
                     for chunk in r.iter_content(chunk_size=1024):
                         if chunk:  # filter out keep-alive new chunks
                             f.write(chunk)
                 if sha1_hash and not _check_sha1(fname, sha1_hash):
-                    raise UserWarning("File {} is downloaded but the content hash does not match."
-                                      " The repo may be outdated or download may be incomplete. "
-                                      "If the `repo_url` is overridden, consider switching to "
-                                      "the default repo.".format(fname))
+                    raise UserWarning(
+                        f"File {fname} is downloaded but the content hash does not match. The repo may be outdated or download may be incomplete. If the `repo_url` is overridden, consider switching to the default repo."
+                    )
                 break
             except Exception as e:
                 retries -= 1
                 if retries <= 0:
                     raise e
                 else:
-                    print("download failed, retrying, {} attempt{} left"
-                          .format(retries, "s" if retries > 1 else ""))
+                    print(
+                        f'download failed, retrying, {retries} attempt{"s" if retries > 1 else ""} left'
+                    )
 
     return fname
 
@@ -164,9 +161,9 @@ def _check_sha1(filename, sha1_hash):
     sha1 = hashlib.sha1()
     with open(filename, "rb") as f:
         while True:
-            data = f.read(1048576)
-            if not data:
-                break
-            sha1.update(data)
+            if data := f.read(1048576):
+                sha1.update(data)
 
+            else:
+                break
     return sha1.hexdigest() == sha1_hash

@@ -43,9 +43,7 @@ def sample_pdf(bins, weights, n_samples, det=False):
     denom = (cdf_g[..., 1] - cdf_g[..., 0])
     denom = torch.where(denom < 1e-5, torch.ones_like(denom), denom)
     t = (u - cdf_g[..., 0]) / denom
-    samples = bins_g[..., 0] + t * (bins_g[..., 1] - bins_g[..., 0])
-
-    return samples
+    return bins_g[..., 0] + t * (bins_g[..., 1] - bins_g[..., 0])
 
 
 def plot_pointcloud(pc, color=None):

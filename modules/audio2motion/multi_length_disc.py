@@ -196,13 +196,13 @@ class MultiWindowDiscriminator(nn.Module):
 
         '''
         clip_from_same_frame = start_frames is None
-        T_start = 0
         # T_end = x_len.max() - win_length
         T_end = x_len.min() - win_length
         if T_end < 0:
             return None, None, start_frames
         T_end = T_end.item()
         if start_frames is None:
+            T_start = 0
             start_frame = np.random.randint(low=T_start, high=T_end + 1)
             start_frames = [start_frame] * x.size(0)
         else:
@@ -220,10 +220,7 @@ class MultiWindowDiscriminator(nn.Module):
                 if cond is not None:
                     c_lst.append(cond[i, start_frame: start_frame + win_length, :])
             x_batch = torch.stack(x_lst, dim=0)
-            if cond is None:
-                c_batch = None
-            else:
-                c_batch = torch.stack(c_lst, dim=0)
+            c_batch = None if cond is None else torch.stack(c_lst, dim=0)
         return x_batch, c_batch, start_frames
 
     def forward(self, x, x_len, cond=None, start_frames_wins=None):

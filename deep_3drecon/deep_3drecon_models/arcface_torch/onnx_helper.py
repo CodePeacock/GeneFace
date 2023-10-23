@@ -47,11 +47,12 @@ class ArcFaceORT:
             return "model_path not exists"
         if not os.path.isdir(self.model_path):
             return "model_path should be directory"
-        onnx_files = []
-        for _file in os.listdir(self.model_path):
-            if _file.endswith('.onnx'):
-                onnx_files.append(osp.join(self.model_path, _file))
-        if len(onnx_files)==0:
+        onnx_files = [
+            osp.join(self.model_path, _file)
+            for _file in os.listdir(self.model_path)
+            if _file.endswith('.onnx')
+        ]
+        if not onnx_files:
             return "do not have onnx files"
         self.model_file = sorted(onnx_files)[-1]
         print('use onnx-model:', self.model_file)
@@ -85,10 +86,7 @@ class ArcFaceORT:
         #print('image_size:', self.image_size)
         input_name = input_cfg.name
         outputs = session.get_outputs()
-        output_names = []
-        for o in outputs:
-            output_names.append(o.name)
-            #print(o.name, o.shape)
+        output_names = [o.name for o in outputs]
         if len(output_names)!=1:
             return "number of output nodes should be 1"
         self.session = session
@@ -112,7 +110,7 @@ class ArcFaceORT:
                 self.crop = lines[:4]
                 input_size = tuple(lines[4:6])
         if input_size!=self.image_size:
-            return "input-size is inconsistant with onnx model input, %s vs %s"%(input_size, self.image_size)
+            return f"input-size is inconsistant with onnx model input, {input_size} vs {self.image_size}"
 
         self.model_size_mb = os.path.getsize(self.model_file) / float(1024*1024)
         if self.model_size_mb > max_model_size_mb:
@@ -128,10 +126,7 @@ class ArcFaceORT:
                     return "pixel_norm.txt should contain 2 lines"
                 input_mean = float(lines[0])
                 input_std = float(lines[1])
-        if input_mean is not None or input_std is not None:
-            if input_mean is None or input_std is None:
-                return "please set input_mean and input_std simultaneously"
-        else:
+        if input_mean is None and input_std is None:
             find_sub = False
             find_mul = False
             for nid, node in enumerate(graph.node[:8]):
@@ -148,18 +143,18 @@ class ArcFaceORT:
             else:
                 input_mean = 127.5
                 input_std = 127.5
+        elif input_mean is None or input_std is None:
+            return "please set input_mean and input_std simultaneously"
         self.input_mean = input_mean
         self.input_std = input_std
         for initn in graph.initializer:
             weight_array = numpy_helper.to_array(initn)
             dt = weight_array.dtype
             if dt.itemsize<4:
-                return 'invalid weight type - (%s:%s)' % (initn.name, dt.name)
+                return f'invalid weight type - ({initn.name}:{dt.name})'
         if test_img is None:
             test_img = get_image('Tom_Hanks_54745')
-            test_img = cv2.resize(test_img, self.image_size)
-        else:
-            test_img = cv2.resize(test_img, self.image_size)
+        test_img = cv2.resize(test_img, self.image_size)
         feat, cost = self.benchmark(test_img)
         batch_result = self.check_batch(test_img)
         batch_result_sum = float(np.sum(batch_result))
@@ -169,7 +164,7 @@ class ArcFaceORT:
             return "batch result output contains NaN!"
 
         if len(feat.shape) < 2:
-           return "the shape of the feature must be two, but get {}".format(str(feat.shape))
+            return f"the shape of the feature must be two, but get {str(feat.shape)}"
 
         if feat.shape[1] > max_feat_dim:
             return "max feat dim exceed, given %d"%feat.shape[1]
@@ -195,8 +190,7 @@ class ArcFaceORT:
         blob = cv2.dnn.blobFromImages(
             images=imgs, scalefactor=1.0 / self.input_std, size=self.image_size,
             mean=(self.input_mean, self.input_mean, self.input_mean), swapRB=True)
-        net_out = self.session.run(self.output_names, {self.input_name: blob})[0]
-        return net_out
+        return self.session.run(self.output_names, {self.input_name: blob})[0]
 
 
     def meta_info(self):
@@ -216,8 +210,7 @@ class ArcFaceORT:
                 nimgs.append(nimg)
             imgs = nimgs
         blob = cv2.dnn.blobFromImages(imgs, 1.0/self.input_std, input_size, (self.input_mean, self.input_mean, self.input_mean), swapRB=True)
-        net_out = self.session.run(self.output_names, {self.input_name : blob})[0]
-        return net_out
+        return self.session.run(self.output_names, {self.input_name : blob})[0]
 
     def benchmark(self, img):
         input_size = self.image_size

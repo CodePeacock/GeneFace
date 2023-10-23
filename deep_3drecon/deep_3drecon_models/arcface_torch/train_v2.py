@@ -55,7 +55,7 @@ def main(args):
         if rank == 0
         else None
     )
-    
+
     wandb_logger = None
     if cfg.using_wandb:
         import wandb
@@ -67,7 +67,11 @@ def main(args):
             print(f"Config Error: {e}")
         # Initialize wandb
         run_name = datetime.now().strftime("%y%m%d_%H%M") + f"_GPU{rank}"
-        run_name = run_name if cfg.suffix_run_name is None else run_name + f"_{cfg.suffix_run_name}"
+        run_name = (
+            run_name
+            if cfg.suffix_run_name is None
+            else f"{run_name}_{cfg.suffix_run_name}"
+        )
         try:
             wandb_logger = wandb.init(
                 entity = cfg.wandb_entity, 
@@ -81,7 +85,7 @@ def main(args):
         except Exception as e:
             print("WandB Data (Entity and Project name) must be provided in config file (base.py).")
             print(f"Config Error: {e}")
-            
+
     train_loader = get_dataloader(
         cfg.rec,
         local_rank,
@@ -157,7 +161,7 @@ def main(args):
 
     for key, value in cfg.items():
         num_space = 25 - len(key)
-        logging.info(": " + key + " " * num_space + str(value))
+        logging.info(f": {key}" + " " * num_space + str(value))
 
     callback_verification = CallBackVerification(
         val_targets=cfg.val_targets, rec_prefix=cfg.rec, 
@@ -207,7 +211,7 @@ def main(args):
                         'Process/Step': global_step,
                         'Process/Epoch': epoch
                     })
-                    
+
                 loss_am.update(loss.item(), 1)
                 callback_logging(global_step, loss_am, epoch, cfg.fp16, lr_scheduler.get_last_lr()[0], amp)
 
@@ -234,14 +238,14 @@ def main(args):
                 model = wandb.Artifact(artifact_name, type='model')
                 model.add_file(path_module)
                 wandb_logger.log_artifact(model)
-                
+
         if cfg.dali:
             train_loader.reset()
 
     if rank == 0:
         path_module = os.path.join(cfg.output, "model.pt")
         torch.save(backbone.module.state_dict(), path_module)
-        
+
         if wandb_logger and cfg.save_artifacts:
             artifact_name = f"{run_name}_Final"
             model = wandb.Artifact(artifact_name, type='model')

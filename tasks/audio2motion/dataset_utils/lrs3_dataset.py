@@ -89,9 +89,7 @@ class LRS3SeqDataset(Dataset):
                 return 0
             if len(batch) == max_sentences:
                 return 1
-            if num_tokens > max_tokens:
-                return 1
-            return 0
+            return 1 if num_tokens > max_tokens else 0
 
         num_tokens_fn = lambda x: self.sizes[x]
         max_tokens = max_tokens if max_tokens is not None else 60000
@@ -146,20 +144,18 @@ class LRS3SeqDataset(Dataset):
             raw_item = self._get_item(idx)
             if raw_item is None:
                 continue
-            item = {}
             item_id = raw_item['item_id'] # str: "<speakerID>_<clipID>"
-            item['item_id'] = item_id
             # audio-related features
             mel = raw_item['mel']
             hubert = raw_item['hubert']
-            item['mel'] = torch.from_numpy(mel).float() # [T_x, c=80]
+            item = {'item_id': item_id, 'mel': torch.from_numpy(mel).float()}
             item['hubert'] = torch.from_numpy(hubert).float() # [T_x, c=80]
             if 'f0' in raw_item.keys():
                 f0 = raw_item['f0']
                 item['f0'] = torch.from_numpy(f0).float() # [T_x,]
             # video-related features
             coeff = raw_item['coeff'] # [T_y ~= T_x//2, c=257]
-            exp = coeff[:, 80:144] 
+            exp = coeff[:, 80:144]
             item['exp'] = torch.from_numpy(exp).float() # [T_y, c=64]
             translation = coeff[:, 254:257] # [T_y, c=3]
             angles = euler2quaterion(coeff[:, 224:227]) # # [T_y, c=4]
@@ -168,7 +164,7 @@ class LRS3SeqDataset(Dataset):
 
             # Load identity for landmark construction
             item['identity'] = torch.from_numpy(raw_item['coeff'][..., :80]).float()
-            
+
             # Load lm3d
             t_lm, dim_lm, _ = raw_item['idexp_lm3d'].shape # [T, 68, 3]
             item['idexp_lm3d'] = torch.from_numpy(raw_item['idexp_lm3d']).reshape(t_lm, -1).float()
@@ -176,7 +172,7 @@ class LRS3SeqDataset(Dataset):
             item['eye_idexp_lm3d'] = convert_to_tensor(eye_idexp_lm3d).reshape(t_lm, -1).float()
             item['mouth_idexp_lm3d'] = convert_to_tensor(mouth_idexp_lm3d).reshape(t_lm, -1).float()
             item['ref_mean_lm3d'] = item['idexp_lm3d'].mean(dim=0).reshape([204,])
-            
+
             self.memory_cache[idx] = item
 
     def _get_item(self, index):
@@ -190,25 +186,23 @@ class LRS3SeqDataset(Dataset):
     def __getitem__(self, idx):
         if hparams['load_db_to_memory']:
             return self.memory_cache[idx]
-        
+
         raw_item = self._get_item(idx)
         if raw_item is None:
             print("loading from binary data failed!")
             return None
-        item = {}
         item_id = raw_item['item_id'] # str: "<speakerID>_<clipID>"
-        item['item_id'] = item_id
         # audio-related features
         mel = raw_item['mel']
         hubert = raw_item['hubert']
-        item['mel'] = torch.from_numpy(mel).float() # [T_x, c=80]
+        item = {'item_id': item_id, 'mel': torch.from_numpy(mel).float()}
         item['hubert'] = torch.from_numpy(hubert).float() # [T_x, c=80]
         if 'f0' in raw_item.keys():
             f0 = raw_item['f0']
             item['f0'] = torch.from_numpy(f0).float() # [T_x,]
         # video-related features
         coeff = raw_item['coeff'] # [T_y ~= T_x//2, c=257]
-        exp = coeff[:, 80:144] 
+        exp = coeff[:, 80:144]
         item['exp'] = torch.from_numpy(exp).float() # [T_y, c=64]
         translation = coeff[:, 254:257] # [T_y, c=3]
         angles = euler2quaterion(coeff[:, 224:227]) # # [T_y, c=4]
@@ -217,14 +211,14 @@ class LRS3SeqDataset(Dataset):
 
         # Load identity for landmark construction
         item['identity'] = torch.from_numpy(raw_item['coeff'][..., :80]).float()
-        
+
         # Load lm3d
         t_lm, dim_lm, _ = raw_item['idexp_lm3d'].shape # [T, 68, 3]
         item['idexp_lm3d'] = torch.from_numpy(raw_item['idexp_lm3d']).reshape(t_lm, -1).float()
         eye_idexp_lm3d, mouth_idexp_lm3d = self.face3d_helper.get_eye_mouth_lm_from_lm3d(raw_item['idexp_lm3d'])
         item['eye_idexp_lm3d'] = convert_to_tensor(eye_idexp_lm3d).reshape(t_lm, -1).float()
         item['mouth_idexp_lm3d'] = convert_to_tensor(mouth_idexp_lm3d).reshape(t_lm, -1).float()
-        
+
         # item = self.memory_cache[idx]
         item['ref_mean_lm3d'] = item['idexp_lm3d'].mean(dim=0).reshape([204,])
         return item
@@ -245,10 +239,7 @@ class LRS3SeqDataset(Dataset):
         return ret
 
     def collater(self, samples):
-        none_idx = []
-        for i in range(len(samples)):
-            if samples[i] is None:
-                none_idx.append(i)
+        none_idx = [i for i in range(len(samples)) if samples[i] is None]
         for i in sorted(none_idx, reverse=True):
             del samples[i]
         if len(samples) == 0:
@@ -263,7 +254,7 @@ class LRS3SeqDataset(Dataset):
         hubert_batch = self._collate_2d([s["hubert"] for s in samples], max_len=x_len, pad_value=0) # [b, t_max_y, 64]
         exp_batch = self._collate_2d([s["exp"] for s in samples], max_len=y_len, pad_value=0) # [b, t_max_y, 64]
         pose_batch = self._collate_2d([s["pose"] for s in samples], max_len=y_len, pad_value=0) # [b, t_max_y, 64]
-        
+
         idexp_lm3d = self._collate_2d([s["idexp_lm3d"] for s in samples], max_len=y_len, pad_value=0) # [b, t_max, 1]
         ref_mean_lm3d = torch.stack([s['ref_mean_lm3d'] for s in samples], dim=0) # [b, h=204*5]
         mouth_idexp_lm3d = self._collate_2d([s["mouth_idexp_lm3d"] for s in samples], max_len=y_len, pad_value=0) # [b, t_max, 1]
@@ -291,13 +282,18 @@ class LRS3SeqDataset(Dataset):
         return batch
 
     def get_dataloader(self):
-        shuffle = True if self.db_key == 'train' else False
+        shuffle = self.db_key == 'train'
         max_tokens = 60000
         batches_idx = self.batch_by_size(self.ordered_indices(), max_tokens=max_tokens)
         batches_idx = batches_idx * 50
         random.shuffle(batches_idx)
-        loader = DataLoader(self, pin_memory=True,collate_fn=self.collater, batch_sampler=batches_idx, num_workers=4)
-        return loader
+        return DataLoader(
+            self,
+            pin_memory=True,
+            collate_fn=self.collater,
+            batch_sampler=batches_idx,
+            num_workers=4,
+        )
 
 
 if __name__ == '__main__':
@@ -309,9 +305,9 @@ if __name__ == '__main__':
     pbar = tqdm.tqdm(total=len(ds.batch_by_size(ds.ordered_indices())))
     # for i in tqdm.trange(len(ds)):
     #     ds[i]
-    for batch in loader:
+    for _ in loader:
         pbar.update(1)
-    
+
     pbar = tqdm.tqdm(total=len(ds.batch_by_size(ds.ordered_indices())))
-    for batch in loader:
+    for _ in loader:
         pbar.update(1)

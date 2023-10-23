@@ -20,13 +20,11 @@ face_reconstructor = deep_3drecon.Reconstructor()
 
 def chunk(iterable, chunk_size):
     final_ret = []
-    cnt = 0
     ret = []
-    for record in iterable:
+    for cnt, record in enumerate(iterable):
         if cnt == 0:
             ret = []
         ret.append(record)
-        cnt += 1
         if len(ret) == chunk_size:
             final_ret.append(ret)
             ret = []
@@ -74,28 +72,26 @@ def extract_lms_mediapipe_job(frames):
         if frames is None:
             return None
         with mp_face_mesh.FaceMesh(
-                            static_image_mode=False,
-                            max_num_faces=1,
-                            refine_landmarks=True,
-                            min_detection_confidence=0.5) as face_mesh:
+                                    static_image_mode=False,
+                                    max_num_faces=1,
+                                    refine_landmarks=True,
+                                    min_detection_confidence=0.5) as face_mesh:
             ldms_normed = []
-            frame_i = 0
             frame_ids = []
-            for i in range(len(frames)):
+            for frame_i, i in enumerate(range(len(frames))):
                 # Convert the BGR image to RGB before processing.
                 ret = face_mesh.process(frames[i])
                 # Print and draw face mesh landmarks on the image.
                 if not ret.multi_face_landmarks:
-                    print(f"Skip Item: Caught errors when mediapipe get face_mesh, maybe No face detected in some frames!")
+                    print(
+                        "Skip Item: Caught errors when mediapipe get face_mesh, maybe No face detected in some frames!"
+                    )
                     return None
                 else:
-                    myFaceLandmarks = []
                     lms = ret.multi_face_landmarks[0]
-                    for lm in lms.landmark:
-                        myFaceLandmarks.append([lm.x, lm.y, lm.z])
+                    myFaceLandmarks = [[lm.x, lm.y, lm.z] for lm in lms.landmark]
                     ldms_normed.append(myFaceLandmarks)
                 frame_ids.append(frame_i)
-                frame_i += 1
         bs, H, W, _ = frames.shape
         ldms478 = np.array(ldms_normed)
         lm68 = mediapipe_lm478_to_face_alignment_lm68(ldms478, H, W, return_2d=True)
@@ -114,7 +110,7 @@ def process_video_batch(fname_lst, out_name_lst=None):
             frames_lst.append(res)
         # for (i, res) in multiprocess_run_tqdm(extract_frames_job, fname_lst, num_workers=1, desc="decord is loading frames in the batch videos..."):
             # frames_lst.append(res)
-    
+
     lm478s_lst = []
     lm68s_lst = []
     lm5s_lst = []
@@ -128,7 +124,7 @@ def process_video_batch(fname_lst, out_name_lst=None):
             lm478s_lst.append(lm478s)
             lm68s_lst.append(lm68s)
             lm5s_lst.append(lm5s)
-        
+
     processed_cnt_in_this_batch = 0
     with Timer("deep_3drecon_pytorch", True):
         for i, fname in tqdm(enumerate(fname_lst), total=len(fname_lst), desc="extracting 3DMM in the batch videos..."):
@@ -140,9 +136,7 @@ def process_video_batch(fname_lst, out_name_lst=None):
                 continue
             num_frames = len(video_rgb)
             batch_size = 32
-            iter_times = num_frames // batch_size
-            last_bs = num_frames % batch_size
-
+            iter_times, last_bs = divmod(num_frames, batch_size)
             coeff_lst = []
             for i_iter in range(iter_times):
                 start_idx = i_iter * batch_size
@@ -165,19 +159,19 @@ def process_video_batch(fname_lst, out_name_lst=None):
             os.makedirs(os.path.dirname(out_name_lst[i]),exist_ok=True)
             np.save(out_name_lst[i], result_dict)
             processed_cnt_in_this_batch +=1
-            
+
     print(f"In this batch {processed_cnt_in_this_batch} files are processed")
 
 
 
 def split_wav(mp4_name):
     try:
-        wav_name = mp4_name[:-4] + '.wav'
+        wav_name = f'{mp4_name[:-4]}.wav'
         if os.path.exists(wav_name):
             return
         video = VideoFileClip(mp4_name,verbose=False)
         dur = video.duration
-        audio = video.audio 
+        audio = video.audio
         assert audio is not None
         audio.write_audiofile(wav_name,fps=16000,verbose=False,logger=None)
     except Exception as e:

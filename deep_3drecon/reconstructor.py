@@ -58,7 +58,7 @@ class Reconstructor(nn.Module):
         if not batch_mode:
             coeff_lst = []
             align_lst = []
-            for i in range(bs):
+            for _ in range(bs):
                 data = data_lst
                 self.model.set_input(data)  # unpack data from data loader
                 self.model.forward()

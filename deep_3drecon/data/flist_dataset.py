@@ -22,7 +22,7 @@ def default_flist_reader(flist):
     """
     imlist = []
     with open(flist, 'r') as rf:
-        for line in rf.readlines():
+        for line in rf:
             impath = line.strip()
             imlist.append(impath)
 

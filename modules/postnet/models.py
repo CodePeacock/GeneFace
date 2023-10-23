@@ -41,8 +41,7 @@ class CNNPostNet(nn.Module):
         diff_x = self.block1(x.transpose(1, 2)).transpose(1,2) * nopadding_mask.unsqueeze(2)
         diff_x = self.block2(diff_x.transpose(1, 2)).transpose(1,2) * nopadding_mask.unsqueeze(2)
         diff_x = self.block3(diff_x.transpose(1, 2)).transpose(1,2) * nopadding_mask.unsqueeze(2)
-        refine_x = x + diff_x
-        return refine_x
+        return x + diff_x
 
 
 class PitchContourCNNPostNet(nn.Module):
@@ -70,8 +69,7 @@ class PitchContourCNNPostNet(nn.Module):
         diff_x = self.block1(inp.transpose(1, 2)).transpose(1,2) * nopadding_mask.unsqueeze(2)
         diff_x = self.block2(diff_x.transpose(1, 2)).transpose(1,2) * nopadding_mask.unsqueeze(2)
         diff_x = self.block3(diff_x.transpose(1, 2)).transpose(1,2) * nopadding_mask.unsqueeze(2)
-        refine_x = x + diff_x
-        return refine_x
+        return x + diff_x
 
 
 class MLPDiscriminator(nn.Module):

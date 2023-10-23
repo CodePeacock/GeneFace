@@ -15,8 +15,7 @@ def fused_add_tanh_sigmoid_multiply(input_a, input_b, n_channels):
     in_act = input_a + input_b
     t_act = torch.tanh(in_act[:, :n_channels_int, :])
     s_act = torch.sigmoid(in_act[:, n_channels_int:, :])
-    acts = t_act * s_act
-    return acts
+    return t_act * s_act
 
 class WN(torch.nn.Module):
     def __init__(self, hidden_channels, kernel_size, dilation_rate, n_layers, gin_channels=0,
@@ -370,8 +369,7 @@ class InvConv(nn.Module):
             weight, dlogdet = self.get_weight(x.device, reverse)
             z = F.conv1d(x, weight)
             if logdet is not None:
-                logdet = logdet + dlogdet * x_len
-            return z, logdet
+                logdet += dlogdet * x_len
         else:
             if self.weight is None:
                 weight, dlogdet = self.get_weight(x.device, reverse)
@@ -379,8 +377,9 @@ class InvConv(nn.Module):
                 weight, dlogdet = self.weight, self.dlogdet
             z = F.conv1d(x, weight)
             if logdet is not None:
-                logdet = logdet - dlogdet * x_len
-            return z, logdet
+                logdet -= dlogdet * x_len
+
+        return z, logdet
 
     def store_inverse(self):
         self.weight, self.dlogdet = self.get_weight('cuda', reverse=True)
@@ -659,12 +658,12 @@ class ResidualCouplingLayer(nn.Module):
             x1 = m + x1 * torch.exp(logs) * x_mask
             x = torch.cat([x0, x1], 1)
             logdet = torch.sum(logs, [1, 2])
-            return x, logdet
         else:
             x1 = (x1 - m) * torch.exp(-logs) * x_mask
             x = torch.cat([x0, x1], 1)
             logdet = -torch.sum(logs, [1, 2])
-            return x, logdet
+
+        return x, logdet
 
 
 class ResidualCouplingBlock(nn.Module):
@@ -687,7 +686,7 @@ class ResidualCouplingBlock(nn.Module):
         self.gin_channels = gin_channels
 
         self.flows = nn.ModuleList()
-        for i in range(n_flows):
+        for _ in range(n_flows):
             self.flows.append(
                 ResidualCouplingLayer(channels, hidden_channels, kernel_size, dilation_rate, n_layers,
                                       gin_channels=gin_channels, mean_only=True, nn_type=nn_type))
@@ -778,10 +777,7 @@ class Glow(nn.Module):
             g = g.transpose(1,2)
 
         logdet_tot = 0
-        if not reverse:
-            flows = self.flows
-        else:
-            flows = reversed(self.flows)
+        flows = self.flows if not reverse else reversed(self.flows)
         if return_hiddens:
             hs = []
         if self.n_sqz > 1:
@@ -798,11 +794,9 @@ class Glow(nn.Module):
             logdet_tot += logdet
         if self.n_sqz > 1:
             x, x_mask = utils.unsqueeze(x, x_mask, self.n_sqz)
-        
+
         x = x.transpose(1,2)
-        if return_hiddens:
-            return x, logdet_tot, hs
-        return x, logdet_tot
+        return (x, logdet_tot, hs) if return_hiddens else (x, logdet_tot)
 
     def store_inverse(self):
         def remove_weight_norm(m):

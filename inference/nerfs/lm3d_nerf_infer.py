@@ -30,10 +30,10 @@ class LM3dNeRFInfer(BaseNeRFInfer):
         lm3d_arr = np.load(inp['cond_name'])[0] # [T, w=16, c=29]
         idexp_lm3d = torch.from_numpy(lm3d_arr).float()
         print(f"Loaded pre-extracted 3D landmark sequence from {inp['cond_name']}!")
-        
+
         # load the deepspeech features as the condition for lm3d torso nerf
         wav16k_name = self.wav16k_name
-        deepspeech_name = wav16k_name[:-4] + '_deepspeech.npy'
+        deepspeech_name = f'{wav16k_name[:-4]}_deepspeech.npy'
         if not os.path.exists(deepspeech_name):
             print(f"Try to extract deepspeech from {wav16k_name}...")
             # deepspeech_python = '/home/yezhenhui/anaconda3/envs/geneface/bin/python' # the path of your python interpreter that has installed DeepSpeech
@@ -52,7 +52,7 @@ class LM3dNeRFInfer(BaseNeRFInfer):
         for idx, sample in enumerate(samples):
             sample['deepspeech_win'] = torch.from_numpy(deepspeech_arr[idx]).float().unsqueeze(0) # [B=1, w=16, C=29]
             sample['deepspeech_wins'] = torch.from_numpy(get_win_conds(deepspeech_arr, idx, smo_win_size=8)).float() # [W=8, w=16, C=29]
-        
+
         idexp_lm3d_mean = self.dataset.idexp_lm3d_mean
         idexp_lm3d_std = self.dataset.idexp_lm3d_std
         idexp_lm3d_normalized = (idexp_lm3d.reshape([-1,68,3]) - idexp_lm3d_mean)/idexp_lm3d_std
@@ -74,7 +74,7 @@ class LM3dNeRFInfer(BaseNeRFInfer):
             idexp_lm3d_normalized_database = torch.stack([s['idexp_lm3d_normalized'] for s in self.dataset.samples]).reshape([-1, 68*3])
             feat_fuse, _, _ = compute_LLE_projection(feats=idexp_lm3d_normalized[:, :48*3], feat_database=idexp_lm3d_normalized_database[:, :48*3], K=10)
             idexp_lm3d_normalized[:, :48*3] = LLE_percent * feat_fuse + (1-LLE_percent) * idexp_lm3d_normalized[:,:48*3]
-        
+
         # step3. inject eye blink
         inject_eye_blink_mode = hparams.get("infer_inject_eye_blink_mode", "none")
         print(f"The eye blink mode is: {inject_eye_blink_mode}")
@@ -103,7 +103,7 @@ class LM3dNeRFInfer(BaseNeRFInfer):
 
         else:
             raise NotImplementedError()
-        
+
         # step4. close the mouth in silent frames
         # todo: remove `infer_sil_ref_frame_idx`, close the mouth using the current frame instead.
         if hparams.get('infer_close_mouth_when_sil', False):
@@ -128,7 +128,7 @@ class LM3dNeRFInfer(BaseNeRFInfer):
         if lm3d_smooth_sigma > 0:
             idexp_lm3d_normalized[:, :48*3] = convert_to_tensor(gaussian_filter1d(idexp_lm3d_normalized[:, :48*3].numpy(), sigma=lm3d_smooth_sigma))
             # idexp_lm3d_normalized = convert_to_tensor(gaussian_filter1d(idexp_lm3d_normalized.numpy(), sigma=lm3d_smooth_sigma))
-        
+
         idexp_lm3d_normalized_numpy = idexp_lm3d_normalized.cpu().numpy()
         idexp_lm3d_normalized_win_numpy = np.stack([get_win_conds(idexp_lm3d_normalized_numpy, i, smo_win_size=hparams['cond_win_size'], pad_option='edge') for i in range(idexp_lm3d_normalized_numpy.shape[0])])
         idexp_lm3d_normalized_win = torch.from_numpy(idexp_lm3d_normalized_win_numpy)

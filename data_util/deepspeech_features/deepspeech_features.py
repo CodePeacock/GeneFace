@@ -42,6 +42,7 @@ def conv_audios_to_deepspeech(audios,
         deepspeech_pb_path)
 
     with tf.compat.v1.Session(graph=graph) as sess:
+        win_size = 16
         for audio_file_path, out_file_path, num_frames in zip(audios, out_files, num_frames_info):
             print("tring to extract deepspeech from audio file: ",audio_file_path)
             print("The target is: ", out_file_path)
@@ -63,14 +64,13 @@ def conv_audios_to_deepspeech(audios,
                         input_lengths_ph: [x.shape[0]]}))
 
             net_output = ds_features.reshape(-1, 29)
-            win_size = 16
-            zero_pad = np.zeros((int(win_size / 2), net_output.shape[1]))
+            zero_pad = np.zeros((win_size // 2, net_output.shape[1]))
             net_output = np.concatenate(
                 (zero_pad, net_output, zero_pad), axis=0)
-            windows = []
-            for window_index in range(0, net_output.shape[0] - win_size, 2):
-                windows.append(
-                    net_output[window_index:window_index + win_size])
+            windows = [
+                net_output[window_index : window_index + win_size]
+                for window_index in range(0, net_output.shape[0] - win_size, 2)
+            ]
             np.save(out_file_path, np.array(windows))
             print("The deepspeech extracted successfully, saved at: ", out_file_path)
             print("The shape is: ", np.array(windows).shape)
@@ -181,11 +181,12 @@ def pure_conv_audio_to_deepspeech(audio,
     zero_pad = np.zeros((int(audio_window_size / 2), network_output.shape[1]))
     network_output = np.concatenate(
         (zero_pad, network_output, zero_pad), axis=0)
-    windows = []
-    for window_index in range(0, network_output.shape[0] - audio_window_size, audio_window_stride):
-        windows.append(
-            network_output[window_index:window_index + audio_window_size])
-
+    windows = [
+        network_output[window_index : window_index + audio_window_size]
+        for window_index in range(
+            0, network_output.shape[0] - audio_window_size, audio_window_stride
+        )
+    ]
     return np.array(windows)
 
 

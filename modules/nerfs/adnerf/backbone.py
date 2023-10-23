@@ -75,8 +75,7 @@ class AudioAttNet(nn.Module):
         y = x[:, :self.in_out_dim].permute(1, 0).unsqueeze(0)  # [b, c] => [1, c, b]
         y = self.attentionConvNet(y) # [1,1,b]
         y = self.attentionNet(y.view(1, self.seq_len)).view(self.seq_len, 1) # [8, 1]
-        smoothed_y = torch.sum(y*x, dim=0) # [8,1]*[8,c]=>[8,c]=>[c,]
-        return smoothed_y
+        return torch.sum(y*x, dim=0)
 
 
 class NeRFBackbone(nn.Module):
@@ -131,7 +130,6 @@ class NeRFBackbone(nn.Module):
             h = F.relu(h)
         rgb = self.color_out_linear(h)  # [..., 3]
 
-        outputs = torch.cat([rgb, sigma], -1)  # [..., 4]
-        return outputs
+        return torch.cat([rgb, sigma], -1)
 
 

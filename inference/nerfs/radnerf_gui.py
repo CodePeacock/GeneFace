@@ -180,61 +180,61 @@ class NeRFGUI:
 
     def test_step(self):
 
-        if self.need_update or self.spp < hparams['gui_max_spp']:
-        
-            starter, ender = torch.cuda.Event(enable_timing=True), torch.cuda.Event(enable_timing=True)
-            starter.record()
+        if not self.need_update and self.spp >= hparams['gui_max_spp']:
+            return
+        starter, ender = torch.cuda.Event(enable_timing=True), torch.cuda.Event(enable_timing=True)
+        starter.record()
 
-            if self.playing:
-                try:
-                    data = next(self.loader)
-                except StopIteration:
-                    self.loader = iter(DataLoader(self.dataset, batch_size=1, collate_fn=self.dataset.collater, shuffle=False))
-                    data = next(self.loader)
-                
-                # if self.opt.asr:
-                    # use the live audio stream
-                    # data['auds'] = self.asr.get_next_feat()
-                move_to_cuda(data)
-                outputs = self.task.test_gui_with_data(data, self.W, self.H)
+        if self.playing:
+            try:
+                data = next(self.loader)
+            except StopIteration:
+                self.loader = iter(DataLoader(self.dataset, batch_size=1, collate_fn=self.dataset.collater, shuffle=False))
+                data = next(self.loader)
 
-                # sync local camera pose
-                self.cam.update_pose(data['pose_matrix'][0].detach().cpu().numpy())
-            
+            # if self.opt.asr:
+                # use the live audio stream
+                # data['auds'] = self.asr.get_next_feat()
+            move_to_cuda(data)
+            outputs = self.task.test_gui_with_data(data, self.W, self.H)
+
+            # sync local camera pose
+            self.cam.update_pose(data['pose_matrix'][0].detach().cpu().numpy())
+
+        else:
+            if self.cond_features is not None:
+                auds = get_audio_features(self.cond_features, 2, self.cond_idx)
             else:
-                if self.cond_features is not None:
-                    auds = get_audio_features(self.cond_features, 2, self.cond_idx)
-                else:
-                    auds = None
-                outputs = self.task.test_gui_with_editable_data(self.cam.pose, self.cam.intrinsics, self.W, self.H, auds, self.ind_index, self.bg_color, self.spp, self.downscale)
+                auds = None
+            outputs = self.task.test_gui_with_editable_data(self.cam.pose, self.cam.intrinsics, self.W, self.H, auds, self.ind_index, self.bg_color, self.spp, self.downscale)
 
-            ender.record()
-            torch.cuda.synchronize()
-            t = starter.elapsed_time(ender)
+        ender.record()
+        torch.cuda.synchronize()
+        t = starter.elapsed_time(ender)
 
-            # update dynamic resolution
-            if self.dynamic_resolution:
-                # max allowed infer time per-frame is 200 ms
-                full_t = t / (self.downscale ** 2)
-                downscale = min(1, max(1/4, math.sqrt(200 / full_t)))
-                if downscale > self.downscale * 1.2 or downscale < self.downscale * 0.8:
-                    self.downscale = downscale
+        # update dynamic resolution
+        if self.dynamic_resolution:
+            # max allowed infer time per-frame is 200 ms
+            full_t = t / (self.downscale ** 2)
+            downscale = min(1, max(1/4, math.sqrt(200 / full_t)))
+            if downscale > self.downscale * 1.2 or downscale < self.downscale * 0.8:
+                self.downscale = downscale
 
-            if self.need_update:
-                self.render_buffer = self.prepare_buffer(outputs)
-                self.spp = 1
-                self.need_update = False
-            else:
-                self.render_buffer = (self.render_buffer * self.spp + self.prepare_buffer(outputs)) / (self.spp + 1)
-                self.spp += 1
-            
-            if self.playing:
-                self.need_update = True
+        if self.need_update:
+            self.render_buffer = self.prepare_buffer(outputs)
+            self.spp = 1
+            self.need_update = False
+        else:
+            self.render_buffer = (self.render_buffer * self.spp + self.prepare_buffer(outputs)) / (self.spp + 1)
+            self.spp += 1
 
-            dpg.set_value("_log_infer_time", f'{t:.4f}ms ({int(1000/t)} FPS)')
-            dpg.set_value("_log_resolution", f'{int(self.downscale * self.W)}x{int(self.downscale * self.H)}')
-            dpg.set_value("_log_spp", self.spp)
-            dpg.set_value("_texture", self.render_buffer)
+        if self.playing:
+            self.need_update = True
+
+        dpg.set_value("_log_infer_time", f'{t:.4f}ms ({int(1000/t)} FPS)')
+        dpg.set_value("_log_resolution", f'{int(self.downscale * self.W)}x{int(self.downscale * self.H)}')
+        dpg.set_value("_log_spp", self.spp)
+        dpg.set_value("_texture", self.render_buffer)
 
         
     def register_dpg(self):

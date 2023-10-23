@@ -74,7 +74,7 @@ class Embedding(object):
 
     def get(self, rimg, landmark):
 
-        assert landmark.shape[0] == 68 or landmark.shape[0] == 5
+        assert landmark.shape[0] in [68, 5]
         assert landmark.shape[1] == 2
         if landmark.shape[0] == 68:
             landmark5 = np.zeros((5, 2), dtype=np.float32)
@@ -111,7 +111,7 @@ class Embedding(object):
 
 # 将一个list尽量均分成n份，限制len(list)==n，份数大于原list内元素个数则分配空list[]
 def divideIntoNstrand(listTemp, n):
-    twoList = [[] for i in range(n)]
+    twoList = [[] for _ in range(n)]
     for i, e in enumerate(listTemp):
         twoList[i % n].append(e)
     return twoList
@@ -238,8 +238,7 @@ def image2template_feature(img_feats=None, templates=None, medias=None):
         # media_norm_feats = media_norm_feats / np.sqrt(np.sum(media_norm_feats ** 2, -1, keepdims=True))
         template_feats[count_template] = np.sum(media_norm_feats, axis=0)
         if count_template % 2000 == 0:
-            print('Finish Calculating {} template features.'.format(
-                count_template))
+            print(f'Finish Calculating {count_template} template features.')
     # template_norm_feats = template_feats / np.sqrt(np.sum(template_feats ** 2, -1, keepdims=True))
     template_norm_feats = sklearn.preprocessing.normalize(template_feats)
     # print(template_norm_feats.shape)
@@ -274,7 +273,7 @@ def verification(template_norm_feats=None,
         similarity_score = np.sum(feat1 * feat2, -1)
         score[s] = similarity_score.flatten()
         if c % 10 == 0:
-            print('Finish {}/{} pairs.'.format(c, total_sublists))
+            print(f'Finish {c}/{total_sublists} pairs.')
     return score
 
 
@@ -299,7 +298,7 @@ def verification2(template_norm_feats=None,
         similarity_score = np.sum(feat1 * feat2, -1)
         score[s] = similarity_score.flatten()
         if c % 10 == 0:
-            print('Finish {}/{} pairs.'.format(c, total_sublists))
+            print(f'Finish {c}/{total_sublists} pairs.')
     return score
 
 
@@ -313,7 +312,7 @@ def read_score(path):
 
 # In[ ]:
 
-assert target == 'IJBC' or target == 'IJBB'
+assert target in ['IJBC', 'IJBB']
 
 # =============================================================
 # load image and template relationships for template feature embedding
@@ -323,8 +322,8 @@ assert target == 'IJBC' or target == 'IJBB'
 # =============================================================
 start = timeit.default_timer()
 templates, medias = read_template_media_list(
-    os.path.join('%s/meta' % image_path,
-                 '%s_face_tid_mid.txt' % target.lower()))
+    os.path.join(f'{image_path}/meta', f'{target.lower()}_face_tid_mid.txt')
+)
 stop = timeit.default_timer()
 print('Time: %.2f s. ' % (stop - start))
 
@@ -338,8 +337,10 @@ print('Time: %.2f s. ' % (stop - start))
 # =============================================================
 start = timeit.default_timer()
 p1, p2, label = read_template_pair_list(
-    os.path.join('%s/meta' % image_path,
-                 '%s_template_pair_label.txt' % target.lower()))
+    os.path.join(
+        f'{image_path}/meta', f'{target.lower()}_template_pair_label.txt'
+    )
+)
 stop = timeit.default_timer()
 print('Time: %.2f s. ' % (stop - start))
 
@@ -353,8 +354,8 @@ print('Time: %.2f s. ' % (stop - start))
 #           img_feats: [image_num x feats_dim] (227630, 512)
 # =============================================================
 start = timeit.default_timer()
-img_path = '%s/loose_crop' % image_path
-img_list_path = '%s/meta/%s_name_5pts_score.txt' % (image_path, target.lower())
+img_path = f'{image_path}/loose_crop'
+img_list_path = f'{image_path}/meta/{target.lower()}_name_5pts_score.txt'
 img_list = open(img_list_path)
 files = img_list.readlines()
 # files_list = divideIntoNstrand(files, rank_size)
@@ -366,8 +367,7 @@ img_feats, faceness_scores = get_image_feature(img_path, files_list,
                                                model_path, 0, gpu_id)
 stop = timeit.default_timer()
 print('Time: %.2f s. ' % (stop - start))
-print('Feature Shape: ({} , {}) .'.format(img_feats.shape[0],
-                                          img_feats.shape[1]))
+print(f'Feature Shape: ({img_feats.shape[0]} , {img_feats.shape[1]}) .')
 
 # # Step3: Get Template Features
 
@@ -430,7 +430,7 @@ save_path = os.path.join(result_dir, args.job)
 if not os.path.exists(save_path):
     os.makedirs(save_path)
 
-score_save_file = os.path.join(save_path, "%s.npy" % target.lower())
+score_save_file = os.path.join(save_path, f"{target.lower()}.npy")
 np.save(score_save_file, score)
 
 # # Step 5: Get ROC Curves and TPR@FPR Table
@@ -462,8 +462,7 @@ for method in methods:
              lw=1,
              label=('[%s (AUC = %0.4f %%)]' %
                     (method.split('-')[-1], roc_auc * 100)))
-    tpr_fpr_row = []
-    tpr_fpr_row.append("%s-%s" % (method, target))
+    tpr_fpr_row = [f"{method}-{target}"]
     for fpr_iter in np.arange(len(x_labels)):
         _, min_index = min(
             list(zip(abs(fpr - x_labels[fpr_iter]), range(len(fpr)))))
@@ -479,5 +478,5 @@ plt.xlabel('False Positive Rate')
 plt.ylabel('True Positive Rate')
 plt.title('ROC on IJB')
 plt.legend(loc="lower right")
-fig.savefig(os.path.join(save_path, '%s.pdf' % target.lower()))
+fig.savefig(os.path.join(save_path, f'{target.lower()}.pdf'))
 print(tpr_fpr_table)

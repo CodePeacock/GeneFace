@@ -28,7 +28,7 @@ def smooth_camera_path(poses, kernel_size=7):
     # poses: [N, 4, 4], numpy array
     N = poses.shape[0]
     K = kernel_size // 2
-    
+
     trans = poses[:, :3, 3].copy() # [N, 3]
     rots = poses[:, :3, :3].copy() # [N, 3, 3]
 
@@ -39,10 +39,7 @@ def smooth_camera_path(poses, kernel_size=7):
         try:
             poses[i, :3, :3] = Rotation.from_matrix(rots[start:end]).mean().as_matrix()
         except:
-            if i == 0:
-                poses[i, :3, :3] = rots[i]
-            else:
-                poses[i, :3, :3] = poses[i-1, :3, :3]
+            poses[i, :3, :3] = rots[i] if i == 0 else poses[i-1, :3, :3]
     return poses
 
 
@@ -84,12 +81,11 @@ class BaseNeRFInfer:
         H, W = batches[0]['H'], batches[0]['W']
         H = int(hparams['infer_scale_factor']*H)
         W = int(hparams['infer_scale_factor']*W)
-        idx_batch_lst = [(idx, batch) for idx,batch in enumerate(batches)]
+        idx_batch_lst = list(enumerate(batches))
 
         print(f"The tmp imge dir is {tmp_imgs_dir}.")
         with torch.no_grad():
-            for (idx, batch) in tqdm.tqdm(idx_batch_lst, total=len(idx_batch_lst),
-                                desc=f"NeRF is rendering frames..."):
+            for (idx, batch) in tqdm.tqdm(idx_batch_lst, total=len(idx_batch_lst), desc="NeRF is rendering frames..."):
                 torch.cuda.empty_cache()
                 if self.device == 'cuda':
                     batch = move_to_cuda(batch)
@@ -147,13 +143,13 @@ class BaseNeRFInfer:
         nerf_task = self.nerf_task.module
         self.dataset = self.dataset_cls('train')
 
-        idx_batch_lst = [(idx, batch) for idx,batch in enumerate(batches)]
+        idx_batch_lst = list(enumerate(batches))
         num_batchs_per_gpu = len(batches) // self.num_gpus
         if self.proc_rank != self.num_gpus-1:
             idx_batch_lst = idx_batch_lst[self.proc_rank*num_batchs_per_gpu:(self.proc_rank+1)*num_batchs_per_gpu]
         else:
             idx_batch_lst = idx_batch_lst[self.proc_rank*num_batchs_per_gpu:]
-        
+
         H, W = batches[0]['H'], batches[0]['W']
         H = int(hparams['infer_scale_factor']*H)
         W = int(hparams['infer_scale_factor']*W)
@@ -184,13 +180,12 @@ class BaseNeRFInfer:
             torch.multiprocessing.set_sharing_strategy('file_system')
             batches = copy.deepcopy(batches)
             mp.spawn(self._forward_nerf_task_ddp, nprocs=self.num_gpus, args=[batches, copy.deepcopy(hparams)])
-            img_dir = self.inp['tmp_imgs_dir']
+            return self.inp['tmp_imgs_dir']
         else:
             self.nerf_task = self.build_nerf_task()
             self.nerf_task.eval()
             self.nerf_task.to(self.device)
-            img_dir = self._forward_nerf_task_single_process(batches)
-        return img_dir
+            return self._forward_nerf_task_single_process(batches)
 
     def get_cond_from_input(self, inp):
         """
@@ -203,7 +198,7 @@ class BaseNeRFInfer:
         process the item into torch.tensor batch
         """
         if self.use_pred_pose:
-            print(f"The head pose mode is: pred")
+            print("The head pose mode is: pred")
             c2w_arr = np.load(self.inp['c2w_name'])[0] # [T, 3, 3]
             print(f"Loaded head pose from {self.inp['c2w_name']}.")
             assert len(samples) - len(c2w_arr) < 5
@@ -212,8 +207,8 @@ class BaseNeRFInfer:
             if len(samples) < len(c2w_arr):
                 c2w_arr = c2w_arr[:len(samples)]
         else:
-            print(f"The head pose mode is: gt")
-            
+            print("The head pose mode is: gt")
+
         for idx, sample in enumerate(samples):
             if idx >= len(self.dataset.samples) and not self.use_pred_pose:
                 # since we use GT head pose from the dataset, the pred_samples cannot be longer than the GT samples
@@ -241,7 +236,7 @@ class BaseNeRFInfer:
             sample['trans'] = torch.tensor(np.ascontiguousarray(trans)).float()
             sample['euler_t0'] = torch.tensor(np.ascontiguousarray(euler_t0)).float()
             sample['trans_t0'] = torch.tensor(np.ascontiguousarray(trans_t0)).float()
-            
+
         if hparams.get("infer_smo_head_pose", True) is True:
             c2w_arr = torch.stack([s['c2w'] for s in samples]).numpy()
             smo_c2w_arr = smooth_camera_path(c2w_arr)
@@ -260,7 +255,7 @@ class BaseNeRFInfer:
 
     def infer_once(self, inp):
         self.inp = inp
-        self.use_pred_pose = True if self.inp.get('c2w_name','') != '' else False
+        self.use_pred_pose = self.inp.get('c2w_name','') != ''
         samples = self.get_cond_from_input(inp)
         batches = self.get_pose_from_ds(samples)
         image_dir = self.forward_system(batches)
@@ -303,14 +298,14 @@ class BaseNeRFInfer:
     # IO-related
     ##############
     @classmethod
-    def save_mp4(self, img_dir, wav_name, out_name):
+    def save_mp4(cls, img_dir, wav_name, out_name):
         os.system(f"ffmpeg -i {img_dir}/%5d.png -i {wav_name} -shortest -v quiet -c:v libx264 -pix_fmt yuv420p -b:v 2000k -r 25 -strict -2 -y {out_name}")
 
     def save_wav16k(self, inp):
         source_name = inp['audio_source_name']
         supported_types = ('.wav', '.mp3', '.mp4', '.avi')
         assert source_name.endswith(supported_types), f"Now we only support {','.join(supported_types)} as audio source!"
-        wav16k_name = source_name[:-4] + '_16k.wav'
+        wav16k_name = f'{source_name[:-4]}_16k.wav'
         self.wav16k_name = wav16k_name
         extract_wav_cmd = f"ffmpeg -i {source_name} -v quiet -f wav -ar 16000 {wav16k_name} -y"
         os.system(extract_wav_cmd)

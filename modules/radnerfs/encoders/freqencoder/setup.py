@@ -19,8 +19,13 @@ elif os.name == "nt":
     def find_cl_path():
         import glob
         for edition in ["Enterprise", "Professional", "BuildTools", "Community"]:
-            paths = sorted(glob.glob(r"C:\\Program Files (x86)\\Microsoft Visual Studio\\*\\%s\\VC\\Tools\\MSVC\\*\\bin\\Hostx64\\x64" % edition), reverse=True)
-            if paths:
+            if paths := sorted(
+                glob.glob(
+                    r"C:\\Program Files (x86)\\Microsoft Visual Studio\\*\\%s\\VC\\Tools\\MSVC\\*\\bin\\Hostx64\\x64"
+                    % edition
+                ),
+                reverse=True,
+            ):
                 return paths[0]
 
     # If cl.exe is not on path, try to find it.

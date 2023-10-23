@@ -41,15 +41,13 @@ class Lm3dNeRF(nn.Module):
             ])
 
     def forward(self, pos, cond_feat, view, run_model_fine=True, **kwargs):
-        out = {}
         pos_embed = self.pos_embedder(pos)
         view_embed = self.view_embedder(view)
         if run_model_fine:
             rgb_sigma = self.model_fine(pos_embed, cond_feat, view_embed)
         else:
             rgb_sigma = self.model_coarse(pos_embed, cond_feat, view_embed)
-        out['rgb_sigma'] = rgb_sigma
-        return out
+        return {'rgb_sigma': rgb_sigma}
 
     def cal_cond_feat(self, cond, with_att=False):
         cond_feat = self.lm_encoder(cond)
@@ -81,12 +79,13 @@ class Lm3dNeRF(nn.Module):
         near = sample['near']
         far = sample['far']
         bg_img = sample['bg_img']
-        c2w = sample['c2w'] 
+        c2w = sample['c2w']
         c2w_t0 = sample['c2w_t0']
         t = sample['t'] 
-        
-        with_att = hparams['with_att'] and (self.global_step >= self.no_smo_iterations)
-        if with_att:
+
+        if with_att := hparams['with_att'] and (
+            self.global_step >= self.no_smo_iterations
+        ):
             cond_feat = self.model.cal_cond_feat(cond_wins, with_att=True)
         else:
             cond_feat = self.model.cal_cond_feat(cond, with_att=False)
@@ -100,10 +99,7 @@ class Lm3dNeRF(nn.Module):
                 network_fn=self.model, N_samples=self.n_samples_per_ray, N_importance=self.n_samples_per_ray_fine,
                 c2w_t=c2w, c2w_t0=c2w_t0,t=t,
                 )
-            model_out = {
-                "rgb_map" : rgb_pred
-            }
-            return model_out
+            return {"rgb_map": rgb_pred}
         else:
             rays_o, rays_d, select_coords = self.rays_sampler(H, W, focal, c2w, n_rays=None, rect=sample['rect'], in_rect_percent=hparams['in_rect_percent'], iterations=self.global_step)
             target = sample['head_img']
@@ -114,8 +110,7 @@ class Lm3dNeRF(nn.Module):
                 bc_rgb=rgb_bc,chunk=self.chunk, c2w=None, cond=cond_feat, near=near, far=far,
                 network_fn=self.model, N_samples=self.n_samples_per_ray, N_importance=self.n_samples_per_ray_fine,
                 c2w_t=c2w, c2w_t0=c2w_t0,t=t,)
-            losses_out = {}
-            losses_out['mse_loss'] = torch.mean((rgb_pred - rgb_gt) ** 2)
+            losses_out = {'mse_loss': torch.mean((rgb_pred - rgb_gt) ** 2)}
             if 'rgb_map_coarse' in extras:
                 losses_out['mse_loss_coarse'] = torch.mean((extras['rgb_map_coarse'] - rgb_gt) ** 2)
             model_out = {

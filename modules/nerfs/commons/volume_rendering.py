@@ -91,9 +91,7 @@ def sample_pdf(bins, weights, N_samples, det=False):
     denom = (cdf_g[..., 1]-cdf_g[..., 0])
     denom = torch.where(denom < 1e-5, torch.ones_like(denom), denom)
     t = (u-cdf_g[..., 0])/denom
-    samples = bins_g[..., 0] + t * (bins_g[..., 1]-bins_g[..., 0])
-
-    return samples
+    return bins_g[..., 0] + t * (bins_g[..., 1]-bins_g[..., 0])
 
 def render_rays(ray_batch,
                 bc_rgb,
@@ -227,8 +225,7 @@ def batchify_render_rays(rays_flat, bc_rgb, cond, chunk, network_fn, N_samples, 
                 all_ret[k] = []
             all_ret[k].append(ret[k])
 
-    all_ret = {k: torch.cat(all_ret[k], 0) for k in all_ret}
-    return all_ret
+    return {k: torch.cat(all_ret[k], 0) for k in all_ret}
 
 
 def render_dynamic_face(H, W, focal, cx, cy, chunk=1024, rays_o=None, rays_d=None, bc_rgb=None, cond=None,

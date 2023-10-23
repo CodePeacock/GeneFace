@@ -62,7 +62,7 @@ def get_dataloader(
     else:
         init_fn = partial(worker_init_fn, num_workers=num_workers, rank=rank, seed=seed)
 
-    train_loader = DataLoaderX(
+    return DataLoaderX(
         local_rank=local_rank,
         dataset=train_set,
         batch_size=batch_size,
@@ -72,8 +72,6 @@ def get_dataloader(
         drop_last=True,
         worker_init_fn=init_fn,
     )
-
-    return train_loader
 
 class BackgroundGenerator(threading.Thread):
     def __init__(self, generator, local_rank, max_prefetch=6):

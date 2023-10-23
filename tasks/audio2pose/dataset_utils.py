@@ -61,22 +61,33 @@ class Audio2PoseDataset(torch.utils.data.Dataset):
         return len(self.samples)
 
     def collater(self, samples):
-        batch = {
-            'idx' : [s['idx'] for s in samples],
-            'audio_window': torch.stack([s['audio'] for s in samples]), # [b, t=30, c=512]
-            'history_pose_and_velocity': torch.stack([s['history_pose_and_velocity'] for s in samples]), # [b, t=30, t=12]
-            'target_pose_and_velocity': torch.stack([s['target_pose_and_velocity'] for s in samples]), # [b, t=12]
+        return {
+            'idx': [s['idx'] for s in samples],
+            'audio_window': torch.stack(
+                [s['audio'] for s in samples]
+            ),  # [b, t=30, c=512]
+            'history_pose_and_velocity': torch.stack(
+                [s['history_pose_and_velocity'] for s in samples]
+            ),  # [b, t=30, t=12]
+            'target_pose_and_velocity': torch.stack(
+                [s['target_pose_and_velocity'] for s in samples]
+            ),  # [b, t=12]
         }
-        return batch
 
     def get_dataloader(self, batch_size=64):
-        loader = DataLoader(self,batch_size=batch_size, pin_memory=False,collate_fn=self.collater, shuffle=True, num_workers=4)
-        return loader
+        return DataLoader(
+            self,
+            batch_size=batch_size,
+            pin_memory=False,
+            collate_fn=self.collater,
+            shuffle=True,
+            num_workers=4,
+        )
 
 if __name__ == '__main__':
     set_hparams()
     ds = Audio2PoseDataset(data_dir='data/binary/videos/May')
     dl = ds.get_dataloader()
-    for batch in dl:
+    for _ in dl:
         print("")
     print("done!")

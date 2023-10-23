@@ -16,7 +16,7 @@ def _read_frame(stream, exit_event, queue, chunk):
 
     while True:
         if exit_event.is_set():
-            print(f'[INFO] read frame thread ends')
+            print('[INFO] read frame thread ends')
             break
         frame = stream.read(chunk, exception_on_overflow=False)
         frame = np.frombuffer(frame, dtype=np.int16).astype(np.float32) / 32767 # [chunk]
@@ -26,7 +26,7 @@ def _play_frame(stream, exit_event, queue, chunk):
 
     while True:
         if exit_event.is_set():
-            print(f'[INFO] play frame thread ends')
+            print('[INFO] play frame thread ends')
             break
         frame = queue.get()
         frame = (frame * 32767).astype(np.int16).tobytes()
@@ -117,12 +117,12 @@ class ASR:
     def listen(self):
         # start
         if self.mode == 'live' and not self.listening:
-            print(f'[INFO] starting read frame thread...')
+            print('[INFO] starting read frame thread...')
             self.process_read_frame.start()
             self.listening = True
-        
+
         if self.play and not self.playing:
-            print(f'[INFO] starting play frame thread...')
+            print('[INFO] starting play frame thread...')
             self.process_play_frame.start()
             self.playing = True
 
@@ -189,7 +189,7 @@ class ASR:
 
         # get a frame of audio
         frame = self.get_audio_frame()
-        
+
         # the last frame
         if frame is None:
             # terminate, but always run the network for the left frames
@@ -202,7 +202,7 @@ class ASR:
             # context not enough, do not run network.
             if len(self.frames) < self.stride_left_size + self.context_size + self.stride_right_size:
                 return
-        
+
         inputs = np.concatenate(self.frames) # [N * chunk]
 
         # discard the old part to save memory
@@ -224,14 +224,14 @@ class ASR:
 
         # very naive, just concat the text output.
         if text != '':
-            self.text = self.text + ' ' + text
+            self.text = f'{self.text} {text}'
 
         # will only run once at ternimation
         if self.terminated:
             self.text += '\n[END]'
             print(self.text)
             if self.opt.asr_save_feats:
-                print(f'[INFO] save all feats for training purpose... ')
+                print('[INFO] save all feats for training purpose... ')
                 feats = torch.cat(self.all_feats, dim=0) # [N, C]
                 # print('[INFO] before unfold', feats.shape)
                 window_size = 16
@@ -274,10 +274,10 @@ class ASR:
 
         import pyaudio
 
-        print(f'[INFO] creating live audio stream ...')
+        print('[INFO] creating live audio stream ...')
 
         audio = pyaudio.PyAudio()
-        
+
         # get devices
         info = audio.get_host_api_info_by_index(0)
         n_devices = info.get('deviceCount')
@@ -287,7 +287,7 @@ class ASR:
                 name = audio.get_device_info_by_host_api_device_index(0, i).get('name')
                 print(f'[INFO] choose audio device {name}, id {i}')
                 break
-        
+
         # get stream
         stream = audio.open(input_device_index=i,
                             format=pyaudio.paInt16,
@@ -295,7 +295,7 @@ class ASR:
                             rate=self.sample_rate,
                             input=True,
                             frames_per_buffer=self.chunk)
-        
+
         return audio, stream
 
     
@@ -303,21 +303,16 @@ class ASR:
 
         if self.mode == 'file':
 
-            if self.idx < self.file_stream.shape[0]:
-                frame = self.file_stream[self.idx: self.idx + self.chunk]
-                self.idx = self.idx + self.chunk
-                return frame
-            else:
+            if self.idx >= self.file_stream.shape[0]:
                 return None
-        
+
+            frame = self.file_stream[self.idx: self.idx + self.chunk]
         else:
 
             frame = self.queue.get()
-            # print(f'[INFO] get frame {frame.shape}')
 
-            self.idx = self.idx + self.chunk
-
-            return frame
+        self.idx = self.idx + self.chunk
+        return frame
 
         
     def frame_to_text(self, frame):
@@ -365,7 +360,7 @@ class ASR:
 
     def clear_queue(self):
         # clear the queue, to reduce potential latency...
-        print(f'[INFO] clear queue')
+        print('[INFO] clear queue')
         if self.mode == 'live':
             self.queue.queue.clear()
         if self.play:
