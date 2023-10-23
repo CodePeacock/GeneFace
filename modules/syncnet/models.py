@@ -88,8 +88,7 @@ class LandmarkHubertSyncNet(nn.Module):
         return loss, d
 
     def cal_cosine_similarity(self, audio_embedding, mouth_embedding):
-        d = nn.functional.cosine_similarity(audio_embedding, mouth_embedding)
-        return d
+        return nn.functional.cosine_similarity(audio_embedding, mouth_embedding)
 
 
 if __name__ == '__main__':

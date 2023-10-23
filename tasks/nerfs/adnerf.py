@@ -106,12 +106,11 @@ class ADNeRFTask(BaseTask):
         near = sample['near']
         far = sample['far']
         bg_img = sample['bg_img']
-        c2w = sample['c2w'] 
+        c2w = sample['c2w']
         c2w_t0 = sample['c2w_t0']
         t = sample['t'] 
-        
-        with_att = self.global_step >= self.no_smo_iterations
-        if with_att:
+
+        if with_att := self.global_step >= self.no_smo_iterations:
             cond_feat = self.model.cal_cond_feat(cond_wins, with_att=True)
         else:
             cond_feat = self.model.cal_cond_feat(cond, with_att=False)
@@ -125,10 +124,7 @@ class ADNeRFTask(BaseTask):
                 network_fn=self.model, N_samples=self.n_samples_per_ray, N_importance=self.n_samples_per_ray_fine,
                 c2w_t=c2w, c2w_t0=c2w_t0,t=t,
                 )
-            model_out = {
-                "rgb_map" : rgb_pred
-            }
-            return model_out
+            return {"rgb_map": rgb_pred}
         else:
             rays_o, rays_d, select_coords = self.rays_sampler(H, W, focal, c2w, n_rays=None, rect=sample['rect'], in_rect_percent=hparams['in_rect_percent'], iterations=self.global_step)
             target = sample['head_img']
@@ -139,8 +135,7 @@ class ADNeRFTask(BaseTask):
                 bc_rgb=rgb_bc,chunk=self.chunk, c2w=None, cond=cond_feat, near=near, far=far,
                 network_fn=self.model, N_samples=self.n_samples_per_ray, N_importance=self.n_samples_per_ray_fine,
                 c2w_t=c2w, c2w_t0=c2w_t0,t=t,)
-            losses_out = {}
-            losses_out['mse_loss'] = torch.mean((rgb_pred - rgb_gt) ** 2)
+            losses_out = {'mse_loss': torch.mean((rgb_pred - rgb_gt) ** 2)}
             if 'rgb_map_coarse' in extras:
                 losses_out['mse_loss_coarse'] = torch.mean((extras['rgb_map_coarse'] - rgb_gt) ** 2)
             model_out = {
@@ -153,20 +148,24 @@ class ADNeRFTask(BaseTask):
     ##########################
     def _training_step(self, sample, batch_idx, optimizer_idx):
         loss_output, model_out = self.run_model(sample)
-        total_loss = sum([v for v in loss_output.values() if isinstance(v, torch.Tensor) and v.requires_grad])
+        total_loss = sum(
+            v
+            for v in loss_output.values()
+            if isinstance(v, torch.Tensor) and v.requires_grad
+        )
         def mse2psnr(x): return -10. * torch.log(x) / torch.log(torch.Tensor([10.])).to(x.device)
+
         loss_output['head_psnr'] = mse2psnr(loss_output['mse_loss'].detach())
         return total_loss, loss_output
     
     def on_before_optimization(self, opt_idx):
         prefix = f"grad_norm_opt_idx_{opt_idx}"
-        grad_norm_dict = {
+        return {
             f'{prefix}/model_coarse': get_grad_norm(self.model.model_coarse),
             f'{prefix}/model_fine': get_grad_norm(self.model.model_fine),
             f'{prefix}/aud_net': get_grad_norm(self.model.aud_net),
             f'{prefix}/audatt_net': get_grad_norm(self.model.audatt_net),
         }
-        return grad_norm_dict
         
     def on_after_optimization(self, epoch, batch_idx, optimizer, optimizer_idx):
         self.scheduler.step(self.global_step // hparams['accumulate_grad_batches'])
@@ -183,14 +182,13 @@ class ADNeRFTask(BaseTask):
 
     @torch.no_grad()
     def validation_step(self, sample, batch_idx):
-        outputs = {}
-        outputs['losses'] = {}
+        outputs = {'losses': {}}
         outputs['losses'], model_out = self.run_model(sample)
         outputs['total_loss'] = sum(outputs['losses'].values())
         outputs['nsamples'] = 1
         outputs = tensors_to_scalars(outputs)
         if self.global_step % hparams['valid_infer_interval'] == 0 \
-                and batch_idx < hparams['num_valid_plots']:
+                    and batch_idx < hparams['num_valid_plots']:
             # idx_lst = [291,156,540,113,28]
             num_val_samples = len(self.val_dataset)
             interval = (num_val_samples-1) // 4

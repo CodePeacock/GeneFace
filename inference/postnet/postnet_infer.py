@@ -81,8 +81,7 @@ class PostnetInfer:
         return [sample]
 
     def forward_system(self, batches, inp):
-        out_dir = self._forward_postnet_task(batches, inp)
-        return out_dir
+        return self._forward_postnet_task(batches, inp)
 
     def _forward_postnet_task(self, batches, inp):
         with torch.no_grad():
@@ -123,7 +122,7 @@ class PostnetInfer:
         source_name = inp['audio_source_name']
         supported_types = ('.wav', '.mp3', '.mp4', '.avi')
         assert source_name.endswith(supported_types), f"Now we only support {','.join(supported_types)} as audio source!"
-        wav16k_name = source_name[:-4] + '_16k.wav'
+        wav16k_name = f'{source_name[:-4]}_16k.wav'
         self.wav16k_name = wav16k_name
         extract_wav_cmd = f"ffmpeg -i {source_name} -f wav -ar 16000 {wav16k_name} -y"
         os.system(extract_wav_cmd)

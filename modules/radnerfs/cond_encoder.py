@@ -85,8 +85,7 @@ class AudioAttNet(nn.Module):
         y = x[:, :self.in_out_dim].permute(1, 0).unsqueeze(0)  # [b, c] => [1, c, b]
         y = self.attentionConvNet(y) # [1,1,b]
         y = self.attentionNet(y.view(1, self.seq_len)).view(self.seq_len, 1) # [8, 1]
-        smoothed_y = torch.sum(y*x, dim=0) # [8,1]*[8,c]=>[8,c]=>[c,]
-        return smoothed_y
+        return torch.sum(y*x, dim=0)
     
 
 class MLP(nn.Module):
@@ -97,10 +96,14 @@ class MLP(nn.Module):
         self.dim_hidden = dim_hidden
         self.num_layers = num_layers
 
-        net = []
-        for l in range(num_layers):
-            net.append(nn.Linear(self.dim_in if l == 0 else self.dim_hidden, self.dim_out if l == num_layers - 1 else self.dim_hidden, bias=False))
-
+        net = [
+            nn.Linear(
+                self.dim_in if l == 0 else self.dim_hidden,
+                self.dim_out if l == num_layers - 1 else self.dim_hidden,
+                bias=False,
+            )
+            for l in range(num_layers)
+        ]
         self.net = nn.ModuleList(net)
     
     def forward(self, x):

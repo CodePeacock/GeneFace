@@ -11,8 +11,7 @@ def compute_tri_normal(geometry, tris):
     vert_2 = torch.index_select(geometry, 1, tri_2)
     vert_3 = torch.index_select(geometry, 1, tri_3)
     nnorm = torch.cross(vert_2-vert_1, vert_3-vert_1, 2)
-    normal = nn.functional.normalize(nnorm)
-    return normal
+    return nn.functional.normalize(nnorm)
 
 
 def euler2rot(euler_angle):
@@ -70,14 +69,12 @@ def proj_pts(rott_geo, focal_length, cxy):
 
 def forward_rott(geometry, euler_angle, trans):
     rot = euler2rot(euler_angle)
-    rott_geo = rot_trans_pts(geometry, rot, trans)
-    return rott_geo
+    return rot_trans_pts(geometry, rot, trans)
 
 def forward_transform(geometry, euler_angle, trans, focal_length, cxy):
     rot = euler2rot(euler_angle)
     rott_geo = rot_trans_pts(geometry, rot, trans)
-    proj_geo = proj_pts(rott_geo, focal_length, cxy)
-    return proj_geo
+    return proj_pts(rott_geo, focal_length, cxy)
 
 
 def cal_lan_loss(proj_lan, gt_lan):

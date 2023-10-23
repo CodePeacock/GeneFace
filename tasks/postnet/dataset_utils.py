@@ -77,8 +77,7 @@ class PostnetDataset(torch.utils.data.Dataset):
         self.audio2motion_ds = LRS3SeqDataset(prefix)
         
     def __getitem__(self, idx):
-        sample = self.audio2motion_ds[idx]
-        return sample
+        return self.audio2motion_ds[idx]
     
     def __len__(self):
         return len(self.samples)
@@ -91,9 +90,13 @@ class PostnetDataset(torch.utils.data.Dataset):
     def get_dataloader(self):
         max_tokens = 60000
         batches_idx = self.audio2motion_ds.batch_by_size(self.audio2motion_ds.ordered_indices(), max_tokens=max_tokens)
-        # loader = DataLoader(self, pin_memory=False,collate_fn=self.collater, batch_sampler=batches_idx, num_workers=0)
-        loader = DataLoader(self, pin_memory=True,collate_fn=self.collater, batch_sampler=batches_idx, num_workers=4)
-        return loader
+        return DataLoader(
+            self,
+            pin_memory=True,
+            collate_fn=self.collater,
+            batch_sampler=batches_idx,
+            num_workers=4,
+        )
 
 if __name__ == '__main__':
     set_hparams()

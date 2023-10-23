@@ -29,8 +29,7 @@ def parse_args():
         type=str,
         help="path to output audio file")
 
-    args = parser.parse_args()
-    return args
+    return parser.parse_args()
 
 
 def extract_audio(in_video,
@@ -47,7 +46,7 @@ def extract_audio(in_video,
     """
     if not out_audio:
         file_stem, _ = os.path.splitext(in_video)
-        out_audio = file_stem + ".wav"
+        out_audio = f"{file_stem}.wav"
     # command1 = "ffmpeg -i {in_video} -vn -acodec copy {aac_audio}"
     # command2 = "ffmpeg -i {aac_audio} -vn -acodec pcm_s16le -ac 1 -ar 22000 {out_audio}"
     # command = "ffmpeg -i {in_video} -vn -acodec pcm_s16le -ac 1 -ar 22000 {out_audio}"
@@ -62,7 +61,7 @@ def main():
     args = parse_args()
     in_video = os.path.expanduser(args.in_video)
     if not os.path.exists(in_video):
-        raise Exception("Input file/directory doesn't exist: {}".format(in_video))
+        raise Exception(f"Input file/directory doesn't exist: {in_video}")
     if os.path.isfile(in_video):
         extract_audio(
             in_video=in_video,

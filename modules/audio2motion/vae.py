@@ -159,10 +159,18 @@ class FVAE(nn.Module):
         self.latent_size = latent_size
         self.use_prior_glow = use_prior_glow
         self.sqz_prior = sqz_prior
-        self.g_pre_net = nn.Sequential(*[
-            nn.Conv1d(gin_channels, gin_channels, kernel_size=s * 2, stride=s, padding=s // 2)
-            for i, s in enumerate(strides)
-        ])
+        self.g_pre_net = nn.Sequential(
+            *[
+                nn.Conv1d(
+                    gin_channels,
+                    gin_channels,
+                    kernel_size=s * 2,
+                    stride=s,
+                    padding=s // 2,
+                )
+                for s in strides
+            ]
+        )
         self.encoder = FVAEEncoder(in_out_channels, hidden_channels, latent_size, kernel_size,
                                    enc_n_layers, gin_channels, strides=strides)
         if use_prior_glow:
@@ -218,15 +226,21 @@ class FVAE(nn.Module):
                 attn = F.softmax(attn, dim=-1)
                 out = torch.bmm(attn, v) # [B, 1, C=256]
                 style_encoding = out.repeat([1,z_q.shape[-1],1]).transpose(1,2) # [B, C=256, T]
-                if self.in_out_channels == 71:
-                    x_recon = torch.cat([self.exp_decoder(style_encoding, x_mask, g), self.pose_decoder(style_encoding, x_mask, g)], dim=1)
-                else:
-                    x_recon = self.decoder(style_encoding, x_mask, g)
+                x_recon = (
+                    torch.cat(
+                        [
+                            self.exp_decoder(style_encoding, x_mask, g),
+                            self.pose_decoder(style_encoding, x_mask, g),
+                        ],
+                        dim=1,
+                    )
+                    if self.in_out_channels == 71
+                    else self.decoder(style_encoding, x_mask, g)
+                )
+            elif self.in_out_channels == 71:
+                x_recon = torch.cat([self.exp_decoder(z_q, x_mask, g), self.pose_decoder(z_q, x_mask, g)], dim=1)
             else:
-                if self.in_out_channels == 71:
-                    x_recon = torch.cat([self.exp_decoder(z_q, x_mask, g), self.pose_decoder(z_q, x_mask, g)], dim=1)
-                else:
-                    x_recon = self.decoder(z_q, x_mask, g)
+                x_recon = self.decoder(z_q, x_mask, g)
             q_dist = dist.Normal(m_q, logs_q.exp())
             if self.use_prior_glow:
                 logqx = q_dist.log_prob(z_q)
@@ -256,15 +270,21 @@ class FVAE(nn.Module):
                 out = torch.bmm(attn, v) # [B, 1, C=256]
                 style_encoding = out.repeat([1,z_p.shape[-1],1]).transpose(1,2) # [B, C=256, T]
                 x_recon = self.decoder(style_encoding, 1, g)
-                if self.in_out_channels == 71:
-                    x_recon = torch.cat([self.exp_decoder(style_encoding, 1, g), self.pose_decoder(style_encoding, 1, g)], dim=1)
-                else:
-                    x_recon = self.decoder(style_encoding, 1, g)
+                x_recon = (
+                    torch.cat(
+                        [
+                            self.exp_decoder(style_encoding, 1, g),
+                            self.pose_decoder(style_encoding, 1, g),
+                        ],
+                        dim=1,
+                    )
+                    if self.in_out_channels == 71
+                    else self.decoder(style_encoding, 1, g)
+                )
+            elif self.in_out_channels == 71:
+                x_recon = torch.cat([self.exp_decoder(z_p, 1, g), self.pose_decoder(z_p, 1, g)], dim=1)
             else:
-                if self.in_out_channels == 71:
-                    x_recon = torch.cat([self.exp_decoder(z_p, 1, g), self.pose_decoder(z_p, 1, g)], dim=1)
-                else:
-                    x_recon = self.decoder(z_p, 1, g)
+                x_recon = self.decoder(z_p, 1, g)
             return x_recon.transpose(1,2), z_p.transpose(1,2)
 
 
@@ -295,7 +315,7 @@ class VAEModel(nn.Module):
 
     def num_params(self, model, print_out=True, model_name="model"):
         parameters = filter(lambda p: p.requires_grad, model.parameters())
-        parameters = sum([np.prod(p.size()) for p in parameters]) / 1_000_000
+        parameters = sum(np.prod(p.size()) for p in parameters) / 1_000_000
         if print_out:
             print(f'| {model_name} Trainable Parameters: %.3fM' % parameters)
         return parameters
@@ -340,15 +360,14 @@ class PitchContourVAEModel(nn.Module):
         super().__init__()
         mel_feat_dim = 64
         mel_in_dim = 1024 # hubert
-        
-        cond_dim = mel_feat_dim
+
         self.mel_encoder = nn.Sequential(*[
                 nn.Conv1d(mel_in_dim, 64, 3, 1, 1, bias=False),
                 nn.BatchNorm1d(64),
                 nn.GELU(),
                 nn.Conv1d(64, mel_feat_dim, 3, 1, 1, bias=False)
             ])
-        
+
         self.pitch_embed = Embedding(300, mel_feat_dim, None)
         self.pitch_encoder = nn.Sequential(*[
                 nn.Conv1d(mel_feat_dim, 64, 3, 1, 1, bias=False),
@@ -356,8 +375,7 @@ class PitchContourVAEModel(nn.Module):
                 nn.GELU(),
                 nn.Conv1d(64, 32, 3, 1, 1, bias=False)
             ])
-        cond_dim += 32
-
+        cond_dim = mel_feat_dim + 32
         self.cond_drop = cond_drop
         if self.cond_drop:
             self.dropout = nn.Dropout(0.5)
@@ -372,7 +390,7 @@ class PitchContourVAEModel(nn.Module):
 
     def num_params(self, model, print_out=True, model_name="model"):
         parameters = filter(lambda p: p.requires_grad, model.parameters())
-        parameters = sum([np.prod(p.size()) for p in parameters]) / 1_000_000
+        parameters = sum(np.prod(p.size()) for p in parameters) / 1_000_000
         if print_out:
             print(f'| {model_name} Trainable Parameters: %.3fM' % parameters)
         return parameters

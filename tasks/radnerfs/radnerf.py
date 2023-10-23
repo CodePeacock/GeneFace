@@ -126,16 +126,14 @@ class RADNeRFTask(BaseTask):
         H, W = sample['H'], sample['W']
 
         cond_inp = cond_wins
-        start_finetune_lip = hparams['finetune_lips'] and self.global_step > hparams['finetune_lips_start_iter']
-
         if not infer:
             # training phase, sample rays from the image
             model_out = self.model.render(rays_o, rays_d, cond_inp, bg_coords, poses, index=idx, staged=False, bg_color=bg_color, perturb=True, force_all_rays=False, **hparams)
             pred_rgb = model_out['rgb_map']
 
-            losses_out = {}
             gt_rgb = sample['gt_img']
-            losses_out['mse_loss'] = torch.mean((pred_rgb - gt_rgb) ** 2) # [B, N, 3] -->  scalar
+            losses_out = {'mse_loss': torch.mean((pred_rgb - gt_rgb) ** 2)}
+            start_finetune_lip = hparams['finetune_lips'] and self.global_step > hparams['finetune_lips_start_iter']
 
             if self.model.training:
                 alphas = model_out['weights_sum'].clamp(1e-5, 1 - 1e-5)
@@ -143,27 +141,25 @@ class RADNeRFTask(BaseTask):
                 ambient = model_out['ambient'] # [N], abs sum
                 face_mask = sample['face_mask'] # [B, N]
                 losses_out['ambient_loss'] = (ambient * (~face_mask.view(-1))).mean()
-                
+
                 if start_finetune_lip and self.finetune_lip_flag:
                     # during the training phase of finetuning lip, all rays are from lip part
                     xmin, xmax, ymin, ymax = sample['lip_rect']
                     gt_rgb = gt_rgb.view(-1, xmax - xmin, ymax - ymin, 3).permute(0, 3, 1, 2).contiguous()
                     pred_rgb = pred_rgb.view(-1, xmax - xmin, ymax - ymin, 3).permute(0, 3, 1, 2).contiguous()
                     losses_out['lpips_loss'] = self.criterion_lpips(pred_rgb, gt_rgb).mean()
-            else:
-                # validation step, calulate lpips loss
-                if 'lip_rect' in sample:
-                    xmin, xmax, ymin, ymax = sample['lip_rect']
-                    lip_gt_rgb = gt_rgb.view(-1,H,W,3)[:,xmin:xmax,ymin:ymax,:].permute(0, 3, 1, 2).contiguous()
-                    lip_pred_rgb = pred_rgb.view(-1,H,W,3)[:,xmin:xmax,ymin:ymax,:].permute(0, 3, 1, 2).contiguous()
-                    losses_out['lpips_loss'] = self.criterion_lpips(lip_pred_rgb, lip_gt_rgb).mean()
-            
+            elif 'lip_rect' in sample:
+                xmin, xmax, ymin, ymax = sample['lip_rect']
+                lip_gt_rgb = gt_rgb.view(-1,H,W,3)[:,xmin:xmax,ymin:ymax,:].permute(0, 3, 1, 2).contiguous()
+                lip_pred_rgb = pred_rgb.view(-1,H,W,3)[:,xmin:xmax,ymin:ymax,:].permute(0, 3, 1, 2).contiguous()
+                losses_out['lpips_loss'] = self.criterion_lpips(lip_pred_rgb, lip_gt_rgb).mean()
+
             if self.model.training and start_finetune_lip:
                 # during training, flip in each iteration, to prevent forgetting other facial parts.
                 self.finetune_lip_flag = not self.finetune_lip_flag
                 self.train_dataset.finetune_lip_flag = self.finetune_lip_flag
             return losses_out, model_out
-            
+
         else:
             # infer phase, generate the whole image
             model_out = self.model.render(rays_o, rays_d, cond_inp, bg_coords, poses, index=idx, staged=False, bg_color=bg_color, perturb=False, force_all_rays=True, **hparams)
@@ -198,8 +194,13 @@ class RADNeRFTask(BaseTask):
             'lpips_loss': hparams['lambda_lpips_loss'],
             'ambient_loss': min(self.global_step / 250000, 1.0) * hparams['lambda_ambient'], # gradually increase it
         }
-        total_loss = sum([loss_weights.get(k, 1) * v for k, v in loss_output.items() if isinstance(v, torch.Tensor) and v.requires_grad])
+        total_loss = sum(
+            loss_weights.get(k, 1) * v
+            for k, v in loss_output.items()
+            if isinstance(v, torch.Tensor) and v.requires_grad
+        )
         def mse2psnr(x): return -10. * torch.log(x) / torch.log(torch.Tensor([10.])).to(x.device)
+
         loss_output['head_psnr'] = mse2psnr(loss_output['mse_loss'].detach())
         outputs.update(loss_output)
 
@@ -243,14 +244,13 @@ class RADNeRFTask(BaseTask):
 
     @torch.no_grad()
     def validation_step(self, sample, batch_idx):
-        outputs = {}
-        outputs['losses'] = {}
+        outputs = {'losses': {}}
         outputs['losses'], model_out = self.run_model(sample, infer=False)
         outputs['total_loss'] = sum(outputs['losses'].values())
         outputs['nsamples'] = 1
         outputs = tensors_to_scalars(outputs)
         if self.global_step % hparams['valid_infer_interval'] == 0 \
-                and batch_idx < hparams['num_valid_plots']:
+                    and batch_idx < hparams['num_valid_plots']:
             num_val_samples = len(self.val_dataset)
             interval = (num_val_samples-1) // 4
             idx_lst = [i * interval for i in range(5)]
@@ -259,7 +259,7 @@ class RADNeRFTask(BaseTask):
             H, W = sample['H'], sample['W']
             img_pred = infer_outputs['rgb_map'].reshape([H, W, 3])
             depth_pred = infer_outputs['depth_map'].reshape([H, W])
-            
+
             base_fn = f"frame_{sample['idx']}"
             self.logger.add_figure(f"frame_{sample['idx']}/img_pred", self.rgb_to_figure(img_pred), self.global_step)
             self.logger.add_figure(f"frame_{sample['idx']}/depth_pred", self.rgb_to_figure(depth_pred), self.global_step)
@@ -372,12 +372,10 @@ class RADNeRFTask(BaseTask):
         pred = preds[0].detach().cpu().numpy()
         pred_depth = preds_depth[0].detach().cpu().numpy()
 
-        outputs = {
+        return {
             'image': pred,
             'depth': pred_depth,
         }
-
-        return outputs
 
     # [GUI] test with provided data
     def test_gui_with_data(self, sample, target_W, target_H):
@@ -402,10 +400,8 @@ class RADNeRFTask(BaseTask):
         pred = preds[0].detach().cpu().numpy()
         pred_depth = preds_depth[0].detach().cpu().numpy()
 
-        outputs = {
+        return {
             'image': pred,
             'depth': pred_depth,
         }
-
-        return outputs
 

@@ -29,14 +29,8 @@ def lm68_2_lm5(in_lm):
 def process_video(fname, out_name=None):
     assert fname.endswith(".mp4")
     if out_name is None:
-        out_name = fname[:-4] + '.npy'
-    tmp_name = out_name[:-4] + '.doi'
-    # if os.path.exists(tmp_name):
-    #     print("tmp exist, skip")
-    #     return
-    # if os.path.exists(out_name):
-        # print("out exisit, skip")
-        # return
+        out_name = f'{fname[:-4]}.npy'
+    tmp_name = f'{out_name[:-4]}.doi'
     os.system(f"touch {tmp_name}")
     cap = cv2.VideoCapture(fname)
     lm68_lst = []
@@ -91,12 +85,12 @@ def process_video(fname, out_name=None):
 
 
 def split_wav(mp4_name):
-    wav_name = mp4_name[:-4] + '.wav'
+    wav_name = f'{mp4_name[:-4]}.wav'
     if os.path.exists(wav_name):
         return
     video = VideoFileClip(mp4_name,verbose=False)
     dur = video.duration
-    audio = video.audio 
+    audio = video.audio
     assert audio is not None
     audio.write_audiofile(wav_name,fps=16000,verbose=False,logger=None)
 

@@ -40,8 +40,7 @@ def parse_args():
         type=str,
         help="path to file with meta-information")
 
-    args = parser.parse_args()
-    return args
+    return parser.parse_args()
 
 
 def extract_features(in_audios,
@@ -92,7 +91,7 @@ def main():
     args = parse_args()
     in_audio = os.path.expanduser(args.input)
     if not os.path.exists(in_audio):
-        raise Exception("Input file/directory doesn't exist: {}".format(in_audio))
+        raise Exception(f"Input file/directory doesn't exist: {in_audio}")
     deepspeech_pb_path = args.deepspeech
     #deepspeech_pb_path="/disk4/keyu/DeepSpeech/deepspeech-0.9.2-models.pbmm"
     if deepspeech_pb_path is None:

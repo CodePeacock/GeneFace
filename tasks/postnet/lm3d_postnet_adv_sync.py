@@ -110,7 +110,6 @@ class PostnetAdvSyncTask(BaseTask):
             if infer:
                 return model_out
         """
-        losses_out = {}
         lrs3_batch = {
             'x_mask': sample['x_mask'],
             'y_mask': sample['y_mask'],
@@ -120,7 +119,7 @@ class PostnetAdvSyncTask(BaseTask):
         with torch.no_grad():
             model_out = self.audio2motion_task.run_model(lrs3_batch, infer=True, temperature=temperature)
             raw_pred_lm3d = model_out['pred']
-        
+
         ### Then forward the PostNet
         if infer:
             refine_pred_lm3d = self.model(raw_pred_lm3d)
@@ -131,11 +130,12 @@ class PostnetAdvSyncTask(BaseTask):
             return model_out
         else:
             person_batch = sample['person_ds']
-            gt_pred_lm3d_for_person_ds = person_batch['idexp_lm3d'] 
+            gt_pred_lm3d_for_person_ds = person_batch['idexp_lm3d']
             with torch.no_grad():
                 model_out = self.audio2motion_task.run_model(person_batch, infer=True, temperature=temperature)
                 raw_pred_lm3d_for_person_ds = model_out['pred']
             refine_pred_lm3d_for_person_ds = self.model(raw_pred_lm3d_for_person_ds) * person_batch['y_mask'].unsqueeze(-1)
+            losses_out = {}
             if hparams.get("loss_type", 'mse') == 'mse':
                 losses_out['mse'] = (gt_pred_lm3d_for_person_ds - refine_pred_lm3d_for_person_ds).pow(2).sum() / (person_batch['y_mask'].sum() * 68*3)
             else:
@@ -164,7 +164,6 @@ class PostnetAdvSyncTask(BaseTask):
     def _training_step(self, sample, batch_idx, optimizer_idx):
         loss_output = {}
         loss_weights = {}
-        disc_start = self.global_step >= hparams["postnet_disc_start_steps"] and hparams['postnet_lambda_adv'] > 0
         if optimizer_idx == 0:
             loss_output, model_out = self.run_model(sample)
             loss_weights = {
@@ -173,32 +172,34 @@ class PostnetAdvSyncTask(BaseTask):
 
             pred = model_out['refine_lm3d']
             self.pred = pred.detach()
+            disc_start = self.global_step >= hparams["postnet_disc_start_steps"] and hparams['postnet_lambda_adv'] > 0
             if disc_start:
                 disc_conf_neg = self.disc_model(x=pred)[0]
                 loss_output['adv'] = (1 - disc_conf_neg).pow(2).mean()
                 loss_weights['adv'] = hparams['postnet_lambda_adv']
                 loss_weights['sync'] = hparams['postnet_lambda_sync']
-        else:
-            # train the discriminator
-            if self.global_step % hparams['postnet_disc_interval'] == 0:
-                pred = self.pred
-                p_ = self.disc_model(x=pred)[0]
-                person_idexp_normalized = sample['person_ds']['idexp_lm3d'] 
-                p = self.disc_model(x=person_idexp_normalized)[0]
-                loss_output['disc_neg_conf'] = p_.detach().mean().item()
-                loss_output['disc_pos_conf'] = p.detach().mean().item()
+        elif self.global_step % hparams['postnet_disc_interval'] == 0:
+            pred = self.pred
+            p_ = self.disc_model(x=pred)[0]
+            person_idexp_normalized = sample['person_ds']['idexp_lm3d'] 
+            p = self.disc_model(x=person_idexp_normalized)[0]
+            loss_output['disc_neg_conf'] = p_.detach().mean().item()
+            loss_output['disc_pos_conf'] = p.detach().mean().item()
 
-                loss_output["disc_fake_loss"] = (p_ - p_.new_zeros(p_.size())).pow(2).mean()
-                loss_output["disc_true_loss"] = (p - p.new_ones(p.size())).pow(2).mean()
-            else:
-                return None
-        total_loss = sum([loss_weights.get(k, 1) * v for k, v in loss_output.items() if isinstance(v, torch.Tensor) and v.requires_grad])
+            loss_output["disc_fake_loss"] = (p_ - p_.new_zeros(p_.size())).pow(2).mean()
+            loss_output["disc_true_loss"] = (p - p.new_ones(p.size())).pow(2).mean()
+        else:
+            return None
+        total_loss = sum(
+            loss_weights.get(k, 1) * v
+            for k, v in loss_output.items()
+            if isinstance(v, torch.Tensor) and v.requires_grad
+        )
         return total_loss, loss_output
 
     @torch.no_grad()
     def validation_step(self, sample, batch_idx):
-        outputs = {}
-        outputs['losses'] = {}
+        outputs = {'losses': {}}
         outputs['losses'], model_out = self.run_model(sample, infer=False)
         outputs = tensors_to_scalars(outputs)
         return outputs

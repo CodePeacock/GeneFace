@@ -19,7 +19,7 @@ class AdNeRFInfer(BaseNeRFInfer):
         else:
             wav16k_name = self.wav16k_name
             print(f"Trying to extract deepspeech from {wav16k_name}...")
-            deepspeech_name = wav16k_name[:-4] + '_deepspeech.npy'
+            deepspeech_name = f'{wav16k_name[:-4]}_deepspeech.npy'
             if not os.path.exists(deepspeech_name):
                 extract_deepspeech_cmd = f'python data_util/deepspeech_features/extract_ds_features.py --input={wav16k_name} --output={deepspeech_name}'
                 os.system(extract_deepspeech_cmd)
@@ -27,7 +27,7 @@ class AdNeRFInfer(BaseNeRFInfer):
             else:
                 print(f"I have Loaded pre-extracted deepspeech from {deepspeech_name}!")
             deepspeech_arr = np.load(deepspeech_name) # [T, w=16, c=29]
-        
+
         num_samples = min(len(deepspeech_arr), self.infer_max_length)
         samples = [{} for _ in range(num_samples)]
         for idx, sample in enumerate(samples):

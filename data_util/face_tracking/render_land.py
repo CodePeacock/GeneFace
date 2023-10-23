@@ -16,8 +16,7 @@ def compute_tri_normal(geometry, tris):
     vert_3 = torch.index_select(geometry, 2, tri_3)
 
     nnorm = torch.cross(vert_2-vert_1, vert_3-vert_1, 1)
-    normal = nn.functional.normalize(nnorm).permute(0, 2, 1)
-    return normal
+    return nn.functional.normalize(nnorm).permute(0, 2, 1)
 
 
 class Compute_normal_base(torch.autograd.Function):
@@ -93,9 +92,9 @@ class Render_RGB(nn.Module):
 def cal_land(proj_geo, is_visible, lands_info, land_num):
     land_index, = render_util.update_contour(
         lands_info, is_visible, land_num)
-    proj_land = torch.index_select(
-        proj_geo.reshape(-1, 3), 0, land_index)[:, :2].reshape(-1, land_num, 2)
-    return proj_land
+    return torch.index_select(proj_geo.reshape(-1, 3), 0, land_index)[
+        :, :2
+    ].reshape(-1, land_num, 2)
 
 
 class Render_Land(nn.Module):

@@ -83,30 +83,28 @@ class VAESyncAudio2MotionTask(BaseTask):
             sample['y'] = sample['idexp_lm3d']
             self.model(sample, model_out, train=True)
 
-        if not infer:
-            # forward the syncnet to get sync_loss
-            losses_out = {}
-            pred_lm3d = model_out['pred']
-            pred_lm3d = pred_lm3d.reshape(pred_lm3d.size(0), pred_lm3d.size(1), 68, 3)
-        
-            _, pred_mouth_lm3d = self.face3d_helper.get_eye_mouth_lm_from_lm3d_batch(pred_lm3d)
-            syncnet_sample = {
-                'mouth_idexp_lm3d': pred_mouth_lm3d.reshape(pred_mouth_lm3d.size(0), pred_mouth_lm3d.size(1), -1),
-                'hubert': sample['hubert'],
-                'y_mask': model_out['mask'],
-            }
-            syncnet_out = self.syncnet_task.run_model(syncnet_sample, infer=True, batch_size=sync_batch_size)
-            losses_out['sync'] = syncnet_out['sync_loss']
-
-            x_gt = sample['idexp_lm3d']
-            x_pred = model_out['pred']
-            x_mask = model_out['mask']
-            losses_out['mse'] = self.mse_loss(x_gt, x_pred, x_mask)
-            losses_out['continuity'] = self.continuity_loss(x_gt, x_pred, x_mask)
-            losses_out['kl'] = model_out['loss_kl']
-            return losses_out, model_out
-        else:
+        if infer:
             return model_out
+        pred_lm3d = model_out['pred']
+        pred_lm3d = pred_lm3d.reshape(pred_lm3d.size(0), pred_lm3d.size(1), 68, 3)
+
+        _, pred_mouth_lm3d = self.face3d_helper.get_eye_mouth_lm_from_lm3d_batch(pred_lm3d)
+        syncnet_sample = {
+            'mouth_idexp_lm3d': pred_mouth_lm3d.reshape(pred_mouth_lm3d.size(0), pred_mouth_lm3d.size(1), -1),
+            'hubert': sample['hubert'],
+            'y_mask': model_out['mask'],
+        }
+        syncnet_out = self.syncnet_task.run_model(syncnet_sample, infer=True, batch_size=sync_batch_size)
+        x_gt = sample['idexp_lm3d']
+        x_pred = model_out['pred']
+        x_mask = model_out['mask']
+        losses_out = {
+            'sync': syncnet_out['sync_loss'],
+            'mse': self.mse_loss(x_gt, x_pred, x_mask),
+        }
+        losses_out['continuity'] = self.continuity_loss(x_gt, x_pred, x_mask)
+        losses_out['kl'] = model_out['loss_kl']
+        return losses_out, model_out
             
     def _training_step(self, sample, batch_idx, optimizer_idx):
         loss_output, model_out = self.run_model(sample)
@@ -116,7 +114,11 @@ class VAESyncAudio2MotionTask(BaseTask):
             'continuity': 3.0,
             'sync': hparams.get('lambda_sync', 0.01) if self.enable_sync else 0.
         }
-        total_loss = sum([loss_weights.get(k, 1) * v for k, v in loss_output.items() if isinstance(v, torch.Tensor) and v.requires_grad])
+        total_loss = sum(
+            loss_weights.get(k, 1) * v
+            for k, v in loss_output.items()
+            if isinstance(v, torch.Tensor) and v.requires_grad
+        )
 
         return total_loss, loss_output
 
@@ -125,8 +127,7 @@ class VAESyncAudio2MotionTask(BaseTask):
 
     @torch.no_grad()
     def validation_step(self, sample, batch_idx):
-        outputs = {}
-        outputs['losses'] = {}
+        outputs = {'losses': {}}
         outputs['losses'], model_out = self.run_model(sample, infer=False, sync_batch_size=10000)
         outputs = tensors_to_scalars(outputs)
         if outputs['losses']['sync'] <= 0.75 and not self.enable_sync:
@@ -155,7 +156,7 @@ class VAESyncAudio2MotionTask(BaseTask):
         pred_exp = model_out['pred']
         self.save_result(pred_exp,  "pred_exp_val" , self.gen_dir)
         if hparams['save_gt']:
-            base_fn = f"gt_exp_val"
+            base_fn = "gt_exp_val"
             self.save_result(sample['exp'],  base_fn , self.gen_dir)
         return outputs
 
@@ -168,10 +169,9 @@ class VAESyncAudio2MotionTask(BaseTask):
         np.save(f"{gen_dir}/{base_fname}.npy", exp_arr)
     
     def get_grad(self, opt_idx):
-        grad_dict = {
+        return {
             'grad/model': get_grad_norm(self.model),
         }
-        return grad_dict
     
     def mse_loss(self, x_gt, x_pred, x_mask):
         # mean squared error, l2 loss

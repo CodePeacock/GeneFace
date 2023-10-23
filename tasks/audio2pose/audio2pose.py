@@ -69,8 +69,6 @@ class Audio2PoseTask(BaseTask):
             if infer:
                 return model_out
         """
-        model_out = {}
-        losses_out = {}
         audio_window = sample['audio_window']
         history_pose_and_velocity = sample['history_pose_and_velocity']
         target_pose_and_velocity = sample['target_pose_and_velocity']
@@ -78,8 +76,13 @@ class Audio2PoseTask(BaseTask):
         ret = self.model.forward(audio_window, history_pose_and_velocity)
         pred_pose_velocity_gmm_params = ret[:,-1, :]
 
-        model_out['pred_pose_velocity_gmm_params'] = pred_pose_velocity_gmm_params
-        losses_out['gmm_loss'] = self.gmm_loss_fn(pred_pose_velocity_gmm_params.unsqueeze(1), target_pose_and_velocity.unsqueeze(1))
+        model_out = {'pred_pose_velocity_gmm_params': pred_pose_velocity_gmm_params}
+        losses_out = {
+            'gmm_loss': self.gmm_loss_fn(
+                pred_pose_velocity_gmm_params.unsqueeze(1),
+                target_pose_and_velocity.unsqueeze(1),
+            )
+        }
         losses_out['history_gmm_loss'] = self.gmm_loss_fn(ret[:-1], history_pose_and_velocity[1:])
 
         return losses_out, model_out
@@ -90,7 +93,11 @@ class Audio2PoseTask(BaseTask):
         loss_weights = {
             'gmm_loss': 1.0,
         }
-        total_loss = sum([loss_weights.get(k, 1) * v for k, v in loss_output.items() if isinstance(v, torch.Tensor) and v.requires_grad])
+        total_loss = sum(
+            loss_weights.get(k, 1) * v
+            for k, v in loss_output.items()
+            if isinstance(v, torch.Tensor) and v.requires_grad
+        )
 
         return total_loss, loss_output
 
@@ -99,8 +106,7 @@ class Audio2PoseTask(BaseTask):
 
     @torch.no_grad()
     def validation_step(self, sample, batch_idx):
-        outputs = {}
-        outputs['losses'] = {}
+        outputs = {'losses': {}}
         outputs['losses'], model_out = self.run_model(sample)
         outputs = tensors_to_scalars(outputs)
         return outputs
@@ -109,7 +115,6 @@ class Audio2PoseTask(BaseTask):
         return super().validation_end(outputs)
         
     def get_grad(self, opt_idx):
-        grad_dict = {
+        return {
             'grad/model': get_grad_norm(self.model),
         }
-        return grad_dict

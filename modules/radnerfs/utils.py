@@ -51,13 +51,30 @@ trunc_exp = _trunc_exp.apply
 
 # ref: https://github.com/NVlabs/instant-ngp/blob/b76004c8cf478880227401ae763be4c02f80b62f/include/neural-graphics-primitives/nerf_loader.h#L50
 def nerf_matrix_to_ngp(pose, scale=4, offset=[0, 0, 0]):
-    new_pose = np.array([
-        [pose[1, 0], -pose[1, 1], -pose[1, 2], pose[1, 3] * scale + offset[0]],
-        [pose[2, 0], -pose[2, 1], -pose[2, 2], pose[2, 3] * scale + offset[1]],
-        [pose[0, 0], -pose[0, 1], -pose[0, 2], pose[0, 3] * scale + offset[2]],
-        [0, 0, 0, 1],
-    ], dtype=np.float32)
-    return new_pose
+    return np.array(
+        [
+            [
+                pose[1, 0],
+                -pose[1, 1],
+                -pose[1, 2],
+                pose[1, 3] * scale + offset[0],
+            ],
+            [
+                pose[2, 0],
+                -pose[2, 1],
+                -pose[2, 2],
+                pose[2, 3] * scale + offset[1],
+            ],
+            [
+                pose[0, 0],
+                -pose[0, 1],
+                -pose[0, 2],
+                pose[0, 3] * scale + offset[2],
+            ],
+            [0, 0, 0, 1],
+        ],
+        dtype=np.float32,
+    )
 
 
 def custom_meshgrid(*args):
@@ -274,8 +291,7 @@ def get_bg_coords(H, W, device):
     X = torch.arange(H, device=device) / (H - 1) * 2 - 1 # in [-1, 1]
     Y = torch.arange(W, device=device) / (W - 1) * 2 - 1 # in [-1, 1]
     xs, ys = custom_meshgrid(X, Y)
-    bg_coords = torch.cat([xs.reshape(-1, 1), ys.reshape(-1, 1)], dim=-1).unsqueeze(0) # [1, H*W, 2], in [-1, 1]
-    return bg_coords
+    return torch.cat([xs.reshape(-1, 1), ys.reshape(-1, 1)], dim=-1).unsqueeze(0)
 
 
 @torch.cuda.amp.autocast(enabled=False)
@@ -302,8 +318,6 @@ def get_rays(poses, intrinsics, H, W, N=-1, patch_size=1, rect=None):
     i = i.t().reshape([1, H*W]).expand([B, H*W]) + 0.5
     j = j.t().reshape([1, H*W]).expand([B, H*W]) + 0.5
 
-    results = {}
-
     if N > 0:
         N = min(N, H*W)
 
@@ -325,7 +339,7 @@ def get_rays(poses, intrinsics, H, W, N=-1, patch_size=1, rect=None):
             inds = inds[:, 0] * W + inds[:, 1] # [N], flatten
 
             inds = inds.expand([B, N])
-        
+
         # only get rays in the specified rect
         elif rect is not None:
             # assert B == 1
@@ -343,11 +357,8 @@ def get_rays(poses, intrinsics, H, W, N=-1, patch_size=1, rect=None):
         j = torch.gather(j, -1, inds)
     else:
         inds = torch.arange(H*W, device=device).expand([B, H*W])
-    
-    results['i'] = i
-    results['j'] = j
-    results['inds'] = inds
 
+    results = {'i': i, 'j': j, 'inds': inds}
     zs = torch.ones_like(i)
     xs = (i - cx) / fx * zs
     ys = (j - cy) / fy * zs

@@ -96,8 +96,7 @@ class BaseOptions():
         It will print both current options and default values(if different).
         It will save options into a text file / [checkpoints_dir] / opt.txt
         """
-        message = ''
-        message += '----------------- Options ---------------\n'
+        message = '' + '----------------- Options ---------------\n'
         for k, v in sorted(vars(opt).items()):
             comment = ''
             default = self.parser.get_default(k)
@@ -110,14 +109,13 @@ class BaseOptions():
         # save to the disk
         expr_dir = os.path.join(opt.checkpoints_dir, opt.name)
         util.mkdirs(expr_dir)
-        file_name = os.path.join(expr_dir, '{}_opt.txt'.format(opt.phase))
+        file_name = os.path.join(expr_dir, f'{opt.phase}_opt.txt')
         try:
             with open(file_name, 'wt') as opt_file:
                 opt_file.write(message)
                 opt_file.write('\n')
         except PermissionError as error:
-            print("permission error {}".format(error))
-            pass
+            print(f"permission error {error}")
 
     def parse(self):
         """Parse our options, create checkpoints directory suffix, and set up gpu device."""
@@ -126,7 +124,7 @@ class BaseOptions():
 
         # process opt.suffix
         if opt.suffix:
-            suffix = ('_' + opt.suffix.format(**vars(opt))) if opt.suffix != '' else ''
+            suffix = f'_{opt.suffix.format(**vars(opt))}' if opt.suffix != '' else ''
             opt.name = opt.name + suffix
 
 
@@ -151,18 +149,20 @@ class BaseOptions():
                 model_dir = os.path.join(opt.checkpoints_dir, opt.pretrained_name)
             if os.path.isdir(model_dir):
                 model_pths = [i for i in os.listdir(model_dir) if i.endswith('pth')]
-                if os.path.isdir(model_dir) and len(model_pths) != 0:
+                if os.path.isdir(model_dir) and model_pths:
                     opt.continue_train= True
-        
-            # update the latest epoch count
+
             if opt.continue_train:
                 if opt.epoch == 'latest':
-                    epoch_counts = [int(i.split('.')[0].split('_')[-1]) for i in model_pths if 'latest' not in i]
-                    if len(epoch_counts) != 0:
+                    if epoch_counts := [
+                        int(i.split('.')[0].split('_')[-1])
+                        for i in model_pths
+                        if 'latest' not in i
+                    ]:
                         opt.epoch_count = max(epoch_counts) + 1
                 else:
                     opt.epoch_count = int(opt.epoch) + 1
-                    
+
 
         self.print_options(opt)
         self.opt = opt

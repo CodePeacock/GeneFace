@@ -24,15 +24,13 @@ class ADNeRF(nn.Module):
         self.audatt_net = AudioAttNet(in_out_dim=self.cond_dim, seq_len=self.smo_win_size)
 
     def forward(self, pos, cond_feat, view, run_model_fine=True, **kwargs):
-        out = {}
         pos_embed = self.pos_embedder(pos)
         view_embed = self.view_embedder(view)
         if run_model_fine:
             rgb_sigma = self.model_fine(pos_embed, cond_feat, view_embed)
         else:
             rgb_sigma = self.model_coarse(pos_embed, cond_feat, view_embed)
-        out['rgb_sigma'] = rgb_sigma
-        return out
+        return {'rgb_sigma': rgb_sigma}
 
     def cal_cond_feat(self, cond, with_att=False):
         cond_feat = self.aud_net(cond)

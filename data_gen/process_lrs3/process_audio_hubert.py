@@ -11,8 +11,7 @@ hubert_model = HubertModel.from_pretrained("facebook/hubert-large-ls960-ft")
 
 def get_hubert_from_16k_wav(wav_16k_name):
     speech_16k, _ = sf.read(wav_16k_name)
-    hubert = get_hubert_from_16k_speech(speech_16k)
-    return hubert
+    return get_hubert_from_16k_speech(speech_16k)
 
 @torch.no_grad()
 def get_hubert_from_16k_speech(speech, device="cuda:0"):
@@ -79,7 +78,7 @@ if __name__ == '__main__':
     for wav_16k_name in tqdm.tqdm(wav_16k_names, total=len(wav_16k_names)):
         spk_id = wav_16k_name.split("/")[-2]
         clip_id = wav_16k_name.split("/")[-1][:-4]
-        out_name = os.path.join(lrs3_dir, spk_id, clip_id+'_hubert.npy')
+        out_name = os.path.join(lrs3_dir, spk_id, f'{clip_id}_hubert.npy')
         if os.path.exists(out_name):
             continue
         speech_16k, _ = sf.read(wav_16k_name)

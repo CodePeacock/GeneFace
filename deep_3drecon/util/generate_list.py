@@ -8,13 +8,13 @@ def write_list(lms_list, imgs_list, msks_list, mode='train',save_folder='datalis
     save_path = os.path.join(save_folder, mode)
     if not os.path.isdir(save_path):
         os.makedirs(save_path)
-    with open(os.path.join(save_path, save_name + 'landmarks.txt'), 'w') as fd:
+    with open(os.path.join(save_path, f'{save_name}landmarks.txt'), 'w') as fd:
         fd.writelines([i + '\n' for i in lms_list])
 
-    with open(os.path.join(save_path, save_name + 'images.txt'), 'w') as fd:
+    with open(os.path.join(save_path, f'{save_name}images.txt'), 'w') as fd:
         fd.writelines([i + '\n' for i in imgs_list])
 
-    with open(os.path.join(save_path, save_name + 'masks.txt'), 'w') as fd:
+    with open(os.path.join(save_path, f'{save_name}masks.txt'), 'w') as fd:
         fd.writelines([i + '\n' for i in msks_list])   
 
 # check if the path is valid

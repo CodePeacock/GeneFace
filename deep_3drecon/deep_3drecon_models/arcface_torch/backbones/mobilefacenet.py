@@ -49,23 +49,18 @@ class DepthWise(Module):
         )
 
     def forward(self, x):
-        short_cut = None
-        if self.residual:
-            short_cut = x
+        short_cut = x if self.residual else None
         x = self.layers(x)
-        if self.residual:
-            output = short_cut + x
-        else:
-            output = x
-        return output
+        return short_cut + x if self.residual else x
 
 
 class Residual(Module):
     def __init__(self, c, num_block, groups, kernel=(3, 3), stride=(1, 1), padding=(1, 1)):
         super(Residual, self).__init__()
-        modules = []
-        for _ in range(num_block):
-            modules.append(DepthWise(c, c, True, kernel, stride, padding, groups))
+        modules = [
+            DepthWise(c, c, True, kernel, stride, padding, groups)
+            for _ in range(num_block)
+        ]
         self.layers = Sequential(*modules)
 
     def forward(self, x):
@@ -119,17 +114,17 @@ class MobileFaceNet(Module):
 
     def _initialize_weights(self):
         for m in self.modules():
-            if isinstance(m, nn.Conv2d):
+            if (
+                isinstance(m, nn.Conv2d)
+                or not isinstance(m, nn.BatchNorm2d)
+                and isinstance(m, nn.Linear)
+            ):
                 nn.init.kaiming_normal_(m.weight, mode='fan_out', nonlinearity='relu')
                 if m.bias is not None:
                     m.bias.data.zero_()
             elif isinstance(m, nn.BatchNorm2d):
                 m.weight.data.fill_(1)
                 m.bias.data.zero_()
-            elif isinstance(m, nn.Linear):
-                nn.init.kaiming_normal_(m.weight, mode='fan_out', nonlinearity='relu')
-                if m.bias is not None:
-                    m.bias.data.zero_()
 
     def forward(self, x):
         with torch.cuda.amp.autocast(self.fp16):

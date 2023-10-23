@@ -117,8 +117,7 @@ def image2template_feature(img_feats=None,
         media_norm_feats = np.array(media_norm_feats)
         template_feats[count_template] = np.sum(media_norm_feats, axis=0)
         if count_template % 2000 == 0:
-            print('Finish Calculating {} template features.'.format(
-                count_template))
+            print(f'Finish Calculating {count_template} template features.')
     template_norm_feats = normalize(template_feats)
     return template_norm_feats, unique_templates
 
@@ -141,7 +140,7 @@ def verification(template_norm_feats=None,
         similarity_score = np.sum(feat1 * feat2, -1)
         score[s] = similarity_score.flatten()
         if c % 10 == 0:
-            print('Finish {}/{} pairs.'.format(c, total_sublists))
+            print(f'Finish {c}/{total_sublists} pairs.')
     return score
 
 
@@ -163,7 +162,7 @@ def verification2(template_norm_feats=None,
         similarity_score = np.sum(feat1 * feat2, -1)
         score[s] = similarity_score.flatten()
         if c % 10 == 0:
-            print('Finish {}/{} pairs.'.format(c, total_sublists))
+            print(f'Finish {c}/{total_sublists} pairs.')
     return score
 
 
@@ -171,24 +170,33 @@ def main(args):
     use_norm_score = True  # if Ture, TestMode(N1)
     use_detector_score = True  # if Ture, TestMode(D1)
     use_flip_test = True  # if Ture, TestMode(F1)
-    assert args.target == 'IJBC' or args.target == 'IJBB'
+    assert args.target in ['IJBC', 'IJBB']
 
     start = timeit.default_timer()
     templates, medias = read_template_media_list(
-        os.path.join('%s/meta' % args.image_path, '%s_face_tid_mid.txt' % args.target.lower()))
+        os.path.join(
+            f'{args.image_path}/meta',
+            f'{args.target.lower()}_face_tid_mid.txt',
+        )
+    )
     stop = timeit.default_timer()
     print('Time: %.2f s. ' % (stop - start))
 
     start = timeit.default_timer()
     p1, p2, label = read_template_pair_list(
-        os.path.join('%s/meta' % args.image_path,
-                     '%s_template_pair_label.txt' % args.target.lower()))
+        os.path.join(
+            f'{args.image_path}/meta',
+            f'{args.target.lower()}_template_pair_label.txt',
+        )
+    )
     stop = timeit.default_timer()
     print('Time: %.2f s. ' % (stop - start))
 
     start = timeit.default_timer()
-    img_path = '%s/loose_crop' % args.image_path
-    img_list_path = '%s/meta/%s_name_5pts_score.txt' % (args.image_path, args.target.lower())
+    img_path = f'{args.image_path}/loose_crop'
+    img_list_path = (
+        f'{args.image_path}/meta/{args.target.lower()}_name_5pts_score.txt'
+    )
     img_list = open(img_list_path)
     files = img_list.readlines()
     dataset = AlignedDataSet(root=img_path, lines=files, align=True)
@@ -201,7 +209,7 @@ def main(args):
     faceness_scores = np.array(faceness_scores).astype(np.float32)
     stop = timeit.default_timer()
     print('Time: %.2f s. ' % (stop - start))
-    print('Feature Shape: ({} , {}) .'.format(img_feats.shape[0], img_feats.shape[1]))
+    print(f'Feature Shape: ({img_feats.shape[0]} , {img_feats.shape[1]}) .')
     start = timeit.default_timer()
 
     if use_flip_test:
@@ -231,10 +239,10 @@ def main(args):
     print('Time: %.2f s. ' % (stop - start))
     result_dir = args.model_root
 
-    save_path = os.path.join(result_dir, "{}_result".format(args.target))
+    save_path = os.path.join(result_dir, f"{args.target}_result")
     if not os.path.exists(save_path):
         os.makedirs(save_path)
-    score_save_file = os.path.join(save_path, "{}.npy".format(args.target))
+    score_save_file = os.path.join(save_path, f"{args.target}.npy")
     np.save(score_save_file, score)
     files = [score_save_file]
     methods = []
@@ -250,8 +258,7 @@ def main(args):
         fpr, tpr, _ = roc_curve(label, scores[method])
         fpr = np.flipud(fpr)
         tpr = np.flipud(tpr)
-        tpr_fpr_row = []
-        tpr_fpr_row.append("%s-%s" % (method, args.target))
+        tpr_fpr_row = [f"{method}-{args.target}"]
         for fpr_iter in np.arange(len(x_labels)):
             _, min_index = min(
                 list(zip(abs(fpr - x_labels[fpr_iter]), range(len(fpr)))))

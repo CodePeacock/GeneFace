@@ -23,7 +23,9 @@ def is_image_file(filename):
 
 def make_dataset(dir, max_dataset_size=float("inf")):
     images = []
-    assert os.path.isdir(dir) or os.path.islink(dir), '%s is not a valid directory' % dir
+    assert os.path.isdir(dir) or os.path.islink(
+        dir
+    ), f'{dir} is not a valid directory'
 
     for root, _, fnames in sorted(os.walk(dir, followlinks=True)):
         for fname in fnames:
@@ -43,8 +45,13 @@ class ImageFolder(data.Dataset):
                  loader=default_loader):
         imgs = make_dataset(root)
         if len(imgs) == 0:
-            raise(RuntimeError("Found 0 images in: " + root + "\n"
-                               "Supported image extensions are: " + ",".join(IMG_EXTENSIONS)))
+            raise RuntimeError(
+                (
+                    f"Found 0 images in: {root}" + "\n"
+                    "Supported image extensions are: "
+                )
+                + ",".join(IMG_EXTENSIONS)
+            )
 
         self.root = root
         self.imgs = imgs
@@ -57,10 +64,7 @@ class ImageFolder(data.Dataset):
         img = self.loader(path)
         if self.transform is not None:
             img = self.transform(img)
-        if self.return_paths:
-            return img, path
-        else:
-            return img
+        return (img, path) if self.return_paths else img
 
     def __len__(self):
         return len(self.imgs)

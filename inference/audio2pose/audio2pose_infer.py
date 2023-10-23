@@ -72,7 +72,7 @@ class Audio2PoseInfer:
 
         # load the deepspeech features as the condition for lm3d torso nerf
         wav16k_name = self.wav16k_name
-        deepspeech_name = wav16k_name[:-4] + '_deepspeech.npy'
+        deepspeech_name = f'{wav16k_name[:-4]}_deepspeech.npy'
         if not os.path.exists(deepspeech_name):
             print(f"Try to extract deepspeech from {wav16k_name}...")
             # deepspeech_python = '/home/yezhenhui/anaconda3/envs/geneface/bin/python' # the path of your python interpreter that has installed DeepSpeech
@@ -85,14 +85,15 @@ class Audio2PoseInfer:
         deepspeech_arr = np.load(deepspeech_name) # [T, w=16, c=29]
         print(f"Loaded deepspeech features from {deepspeech_name}.")
         # get window condition of deepspeech
-        sample = {}
-        # sample['deepspeech'] = torch.from_numpy(deepspeech_arr).float().reshape([-1, 16*29])
-        sample['deepspeech'] = torch.from_numpy(deepspeech_arr[:, 7:9,:]).float().reshape([-1, 2*29])
+        sample = {
+            'deepspeech': torch.from_numpy(deepspeech_arr[:, 7:9, :])
+            .float()
+            .reshape([-1, 2 * 29])
+        }
         return [sample]
 
     def forward_system(self, batches, inp):
-        out_dir = self._forward_audio2pose_task(batches, inp)
-        return out_dir
+        return self._forward_audio2pose_task(batches, inp)
 
     def _forward_audio2pose_task(self, batches, inp):
         with torch.no_grad():
@@ -138,7 +139,7 @@ class Audio2PoseInfer:
         source_name = inp['audio_source_name']
         supported_types = ('.wav', '.mp3', '.mp4', '.avi')
         assert source_name.endswith(supported_types), f"Now we only support {','.join(supported_types)} as audio source!"
-        wav16k_name = source_name[:-4] + '_16k.wav'
+        wav16k_name = f'{source_name[:-4]}_16k.wav'
         self.wav16k_name = wav16k_name
         extract_wav_cmd = f"ffmpeg -i {source_name} -f wav -ar 16000 -v quiet {wav16k_name} -y"
         os.system(extract_wav_cmd)

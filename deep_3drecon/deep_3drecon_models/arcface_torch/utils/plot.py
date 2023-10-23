@@ -24,8 +24,8 @@ def read_template_pair_list(path):
 
 
 p1, p2, label = read_template_pair_list(
-    os.path.join('%s/meta' % image_path,
-                 '%s_template_pair_label.txt' % 'ijbc'))
+    os.path.join(f'{image_path}/meta', 'ijbc_template_pair_label.txt')
+)
 
 methods = []
 scores = []
@@ -51,8 +51,7 @@ for method in methods:
              lw=1,
              label=('[%s (AUC = %0.4f %%)]' %
                     (method.split('-')[-1], roc_auc * 100)))
-    tpr_fpr_row = []
-    tpr_fpr_row.append(method)
+    tpr_fpr_row = [method]
     for fpr_iter in np.arange(len(x_labels)):
         _, min_index = min(
             list(zip(abs(fpr - x_labels[fpr_iter]), range(len(fpr)))))

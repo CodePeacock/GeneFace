@@ -29,7 +29,7 @@ def POS(xp, x):
 
     k, _, _, _ = np.linalg.lstsq(A, b)
 
-    R1 = k[0:3]
+    R1 = k[:3]
     R2 = k[4:7]
     sTx = k[3]
     sTy = k[7]
@@ -69,7 +69,6 @@ def BBRegression(points, params):
 
 # utils for landmark detection
 def img_padding(img, box):
-    success = True
     bbox = box.copy()
     res = np.zeros([2*img.shape[0], 2*img.shape[1], 3])
     res[img.shape[0] // 2: img.shape[0] + img.shape[0] //
@@ -77,22 +76,19 @@ def img_padding(img, box):
 
     bbox[0] = bbox[0] + img.shape[1] // 2
     bbox[1] = bbox[1] + img.shape[0] // 2
-    if bbox[0] < 0 or bbox[1] < 0:
-        success = False
+    success = bbox[0] >= 0 and bbox[1] >= 0
     return res, bbox, success
 
 # utils for landmark detection
 def crop(img, bbox):
     padded_img, padded_bbox, flag = img_padding(img, bbox)
-    if flag:
-        crop_img = padded_img[padded_bbox[1]: padded_bbox[1] +
-                            padded_bbox[3], padded_bbox[0]: padded_bbox[0] + padded_bbox[2]]
-        crop_img = cv2.resize(crop_img.astype(np.uint8),
-                            (224, 224), interpolation=cv2.INTER_CUBIC)
-        scale = 224 / padded_bbox[3]
-        return crop_img, scale
-    else:
+    if not flag:
         return padded_img, 0
+    crop_img = padded_img[padded_bbox[1]: padded_bbox[1] +
+                        padded_bbox[3], padded_bbox[0]: padded_bbox[0] + padded_bbox[2]]
+    crop_img = cv2.resize(crop_img.astype(np.uint8),
+                        (224, 224), interpolation=cv2.INTER_CUBIC)
+    return crop_img, 224 / padded_bbox[3]
 
 # utils for landmark detection
 def scale_trans(img, lm, t, s):
@@ -182,11 +178,7 @@ def align_img(img, lm, lm3D, mask=None, target_size=224., rescale_factor=102.):
     w0, h0 = img.size
 
 
-    if lm.shape[0] != 5:
-        lm5p = extract_5p(lm)
-    else:
-        lm5p = lm
-
+    lm5p = extract_5p(lm) if lm.shape[0] != 5 else lm
     # calculate translation and scale factors using 5 facial landmarks and standard landmarks of a 3D face
     t, s = POS(lm5p.transpose(), lm3D.transpose())
     s = rescale_factor/s
@@ -223,8 +215,6 @@ def estimate_norm(lm_68p, H):
 
 def estimate_norm_torch(lm_68p, H):
     lm_68p_ = lm_68p.detach().cpu().numpy()
-    M = []
-    for i in range(lm_68p_.shape[0]):
-        M.append(estimate_norm(lm_68p_[i], H))
+    M = [estimate_norm(lm_68p_[i], H) for i in range(lm_68p_.shape[0])]
     M = torch.tensor(np.array(M), dtype=torch.float32).to(lm_68p.device)
     return M

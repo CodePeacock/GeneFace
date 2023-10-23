@@ -15,10 +15,7 @@ def librosa_pad_lr(x, fsize, fshift, pad_sides=1):
     assert pad_sides in (1, 2)
     # return int(fsize // 2)
     pad = (x.shape[0] // fshift + 1) * fshift - x.shape[0]
-    if pad_sides == 1:
-        return 0, pad
-    else:
-        return pad // 2, pad // 2 + pad % 2
+    return (0, pad) if pad_sides == 1 else (pad // 2, pad // 2 + pad % 2)
 
 def extract_mel_from_fname(wav_path,
                       fft_size=512,
@@ -77,7 +74,7 @@ def extract_f0_from_wav_and_mel(wav, mel,
 def extract_mel_f0_from_fname(fname, out_name=None):
     assert fname.endswith(".wav")
     if out_name is None:
-        out_name = fname[:-4] + '_audio.npy'
+        out_name = f'{fname[:-4]}_audio.npy'
 
     wav, mel = extract_mel_from_fname(fname)
     f0, f0_coarse = extract_f0_from_wav_and_mel(wav, mel)

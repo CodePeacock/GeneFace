@@ -193,9 +193,7 @@ class TransformerStyleFusionModel(nn.Module):
 
         feat = torch.cat([feat, sty_feat], dim=-1) # [batch, T, H=64+64]
         feat = self.backbone2(feat, pad_mask) # [batch, T, H=128]
-        out = self.out_layer(feat, y_mask) # [batch, T//2, H=out_dim]
-
-        return out
+        return self.out_layer(feat, y_mask)
 
 
 if __name__ == '__main__':

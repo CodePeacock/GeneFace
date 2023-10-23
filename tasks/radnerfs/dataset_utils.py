@@ -18,7 +18,7 @@ def smooth_camera_path(poses, kernel_size=7):
     # poses: [N, 4, 4], numpy array
     N = poses.shape[0]
     K = kernel_size // 2
-    
+
     trans = poses[:, :3, 3].copy() # [N, 3]
     rots = poses[:, :3, :3].copy() # [N, 3, 3]
 
@@ -29,10 +29,7 @@ def smooth_camera_path(poses, kernel_size=7):
         try:
             poses[i, :3, :3] = Rotation.from_matrix(rots[start:end]).mean().as_matrix()
         except:
-            if i == 0:
-                poses[i, :3, :3] = rots[i]
-            else:
-                poses[i, :3, :3] = poses[i-1, :3, :3]
+            poses[i, :3, :3] = rots[i] if i == 0 else poses[i-1, :3, :3]
     return poses
 
 
@@ -96,12 +93,19 @@ class RADNeRFDataset(torch.utils.data.Dataset):
             self.conds = torch.stack([s['idexp_lm3d_normalized_win'].reshape([hparams['cond_win_size'], 204]) for s in self.samples]) # [B=1, T=1, C=204]
         else:
             raise NotImplementedError
-        
+
         self.finetune_lip_flag = False
         self.lips_rect = []
         for sample in self.samples:
             img_id = sample['idx']
-            lms = np.loadtxt(os.path.join(hparams['processed_data_dir'],hparams['video_id'], 'ori_imgs', str(img_id) + '.lms')) # [68, 2]
+            lms = np.loadtxt(
+                os.path.join(
+                    hparams['processed_data_dir'],
+                    hparams['video_id'],
+                    'ori_imgs',
+                    f'{str(img_id)}.lms',
+                )
+            )
             lips = slice(48, 60)
             xmin, xmax = int(lms[lips, 1].min()), int(lms[lips, 1].max())
             ymin, ymax = int(lms[lips, 0].min()), int(lms[lips, 0].max())
@@ -126,7 +130,7 @@ class RADNeRFDataset(torch.utils.data.Dataset):
 
     def __getitem__(self, idx):
         raw_sample = self.samples[idx]
-        
+
         if hparams.get("load_imgs_to_memory", True):
             # disable it to save memory usage.
             # for 5500 images, it takes 1 minutes to imread, by contrast, only 1s is needed to index them in memory. 
@@ -153,9 +157,8 @@ class RADNeRFDataset(torch.utils.data.Dataset):
             'face_rect': raw_sample['face_rect'],
             'lip_rect': self.lips_rect[idx],
             'bg_img': self.bg_img,
+            'cond_wins': get_audio_features(self.conds, att_mode=2, index=idx),
         }
-
-        sample['cond_wins'] = get_audio_features(self.conds, att_mode=2, index=idx)
 
         ngp_pose = self.poses[idx].unsqueeze(0)
         sample['pose'] = convert_poses(ngp_pose) # [B, 6]
@@ -165,7 +168,7 @@ class RADNeRFDataset(torch.utils.data.Dataset):
             'torso_img': torso_img.float() / 255.,
             'gt_img': gt_img.float() / 255.,
         })
-        
+
         if self.training:
             if self.finetune_lip_flag:
                 # the finetune_lip_flag is controlled by the task that use this dataset 
@@ -187,7 +190,7 @@ class RADNeRFDataset(torch.utils.data.Dataset):
         bg_torso_img = bg_torso_img[..., :3] * bg_torso_img[..., 3:] + self.bg_img * (1 - bg_torso_img[..., 3:])
         bg_torso_img = bg_torso_img.view(1, -1, 3) # treat torso as a part of background
         bg_img =  self.bg_img.view(1, -1, 3)
-        
+
         C = sample['gt_img'].shape[-1]
         if self.training:
             bg_img = torch.gather(bg_img.cuda(), 1, torch.stack(3 * [rays['inds']], -1)) # [B, N, 3]

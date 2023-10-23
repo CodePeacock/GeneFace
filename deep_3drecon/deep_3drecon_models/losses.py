@@ -82,10 +82,7 @@ def reg_loss(coeffs_dict, opt=None):
 
     """
     # coefficient regularization to ensure plausible 3d faces
-    if opt:
-        w_id, w_exp, w_tex = opt.w_id, opt.w_exp, opt.w_tex
-    else:
-        w_id, w_exp, w_tex = 1, 1, 1, 1
+    w_id, w_exp, w_tex = (opt.w_id, opt.w_exp, opt.w_tex) if opt else (1, 1, 1, 1)
     creg_loss = w_id * torch.sum(coeffs_dict['id'] ** 2) +  \
            w_exp * torch.sum(coeffs_dict['exp'] ** 2) + \
            w_tex * torch.sum(coeffs_dict['tex'] ** 2)
@@ -108,6 +105,7 @@ def reflectance_loss(texture, mask):
     """
     mask = mask.reshape([1, mask.shape[0], 1])
     texture_mean = torch.sum(mask * texture, dim=1, keepdims=True) / torch.sum(mask)
-    loss = torch.sum(((texture - texture_mean) * mask)**2) / (texture.shape[0] * torch.sum(mask))
-    return loss
+    return torch.sum(((texture - texture_mean) * mask) ** 2) / (
+        texture.shape[0] * torch.sum(mask)
+    )
 

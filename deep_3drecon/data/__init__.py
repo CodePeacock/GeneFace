@@ -23,7 +23,7 @@ def find_dataset_using_name(dataset_name):
     be instantiated. It has to be a subclass of BaseDataset,
     and it is case-insensitive.
     """
-    dataset_filename = "data." + dataset_name + "_dataset"
+    dataset_filename = f"data.{dataset_name}_dataset"
     datasetlib = importlib.import_module(dataset_filename)
 
     dataset = None
@@ -34,7 +34,9 @@ def find_dataset_using_name(dataset_name):
             dataset = cls
 
     if dataset is None:
-        raise NotImplementedError("In %s.py, there should be a subclass of BaseDataset with class name that matches %s in lowercase." % (dataset_filename, target_dataset_name))
+        raise NotImplementedError(
+            f"In {dataset_filename}.py, there should be a subclass of BaseDataset with class name that matches {target_dataset_name} in lowercase."
+        )
 
     return dataset
 
@@ -56,8 +58,7 @@ def create_dataset(opt, rank=0):
         >>> dataset = create_dataset(opt)
     """
     data_loader = CustomDatasetDataLoader(opt, rank=rank)
-    dataset = data_loader.load_data()
-    return dataset
+    return data_loader.load_data()
 
 class CustomDatasetDataLoader():
     """Wrapper class of Dataset class that performs multi-threaded data loading"""

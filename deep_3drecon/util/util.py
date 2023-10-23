@@ -48,7 +48,9 @@ def find_class_in_module(target_cls_name, module):
         if name.lower() == target_cls_name:
             cls = clsobj
 
-    assert cls is not None, "In %s, there should be a class whose name matches %s in lowercase without underscore(_)" % (module, target_cls_name)
+    assert (
+        cls is not None
+    ), f"In {module}, there should be a class whose name matches {target_cls_name} in lowercase without underscore(_)"
 
     return cls
 
@@ -188,11 +190,7 @@ def draw_landmarks(img, landmark, color='r', step=2):
         landmark         -- numpy.array, (B, 68, 2), y direction is opposite to v direction
         color            -- str, 'r' or 'b' (red or blue)
     """
-    if color =='r':
-        c = np.array([255., 0, 0])
-    else:
-        c = np.array([0, 0, 255.])
-
+    c = np.array([255., 0, 0]) if color =='r' else np.array([0, 0, 255.])
     _, H, W, _ = img.shape
     img, landmark = img.copy(), landmark.copy()
     landmark[..., 1] = H - 1 - landmark[..., 1]

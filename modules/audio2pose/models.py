@@ -28,10 +28,7 @@ class Audio2PoseModel(nn.Module):
         pred_pose_velocity_params: the GMM params of pose_and_velocity at t+1 steps, [b, c=12*2+1]
         """
         audio = self.audio_encoder(audio)
-        ret = self.backbone(history_pose_velocity, audio) # [b, t, c]
-        # pred_pose_velocity_params = ret[:, -1, :] # [b, c]
-        # return pred_pose_velocity_params
-        return ret
+        return self.backbone(history_pose_velocity, audio)
 
     def autoregressive_infer(self, long_audio, init_pose=None):
         """
@@ -41,7 +38,7 @@ class Audio2PoseModel(nn.Module):
         n_frames = len(long_audio)
         pred_pose_and_velocity_lst = []
 
-        audio_insert = long_audio[0:1].repeat([self.recept_field-1,1])
+        audio_insert = long_audio[:1].repeat([self.recept_field-1,1])
         long_audio = torch.cat([audio_insert, long_audio], dim=0)
         history_pose_and_velocity = torch.zeros([self.recept_field, 12]).float().to(long_audio.device)
         if init_pose is not None:
@@ -57,8 +54,7 @@ class Audio2PoseModel(nn.Module):
                 pred_pose_and_velocity_lst.append(pred_pose_and_velocity.cpu().squeeze()) # [c=12]
                 history_pose_and_velocity = torch.cat([history_pose_and_velocity[1:,:], pred_pose_and_velocity.squeeze(0)],dim=0) # [29,c=12] + [1, c=12] ==> [30, c=12]
         pred_pose_and_velocity = torch.stack(pred_pose_and_velocity_lst) # [T, c=12]
-        pred_pose = pred_pose_and_velocity[:,:6]
-        return pred_pose
+        return pred_pose_and_velocity[:,:6]
 
 
 class WaveNet(nn.Module):
@@ -98,7 +94,7 @@ class WaveNet(nn.Module):
                  cond_channels = 256,
                  activation = 'leakyrelu'):
         super(WaveNet, self).__init__()
-        
+
         self.layers = residual_layers
         self.blocks = residual_blocks
         self.dilation_channels = dilation_channels
@@ -113,13 +109,13 @@ class WaveNet(nn.Module):
         self.bias = use_bias
         self.cond = cond
         self.cond_channels = cond_channels
-        
+
         # build modules
         self.dilations = []
         self.dilation_queues = []
         residual_blocks = []
         self.receptive_field = 1
-        
+
         # 1x1 convolution to create channels
         self.start_conv1 = nn.Conv1d(in_channels=self.input_channels,
                                      out_channels=self.residual_channels,
@@ -134,12 +130,12 @@ class WaveNet(nn.Module):
         elif activation == 'leakyrelu':
             self.activation = nn.LeakyReLU(0.2)
         self.drop_out2D = nn.Dropout2d(p=0.5)
-        
+
         # build residual blocks
-        for b in range(self.blocks):
+        for _ in range(self.blocks):
             new_dilation = 1
             additional_scope = kernel_size - 1
-            for i in range(self.layers):
+            for _ in range(self.layers):
                 # create current residual block
                 residual_blocks.append(residual_block(dilation = new_dilation,
                                                       dilation_channels = self.dilation_channels,
@@ -150,13 +146,13 @@ class WaveNet(nn.Module):
                                                       cond = self.cond,
                                                       cond_channels = self.cond_channels))
                 new_dilation *= 2
-                
+
                 self.receptive_field += additional_scope
                 additional_scope *= 2
-        
+
         self.residual_blocks = nn.ModuleList(residual_blocks)
         # end convolutions
-        
+
         self.end_conv_1 = nn.Conv1d(in_channels = self.skip_channels,
                                     out_channels = self.output_channels,
                                     kernel_size = 1,
@@ -169,8 +165,7 @@ class WaveNet(nn.Module):
     
     def parameter_count(self):
         par = list(self.parameters())
-        s = sum([np.prod(list(d.size())) for d in par])
-        return s
+        return sum(np.prod(list(d.size())) for d in par)
     
     def forward(self, inp, cond=None):
         '''

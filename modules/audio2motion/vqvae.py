@@ -74,10 +74,18 @@ class VQVAE(nn.Module):
         self.strides = strides
         self.hidden_size = hidden_channels
         self.latent_size = latent_size
-        self.g_pre_net = nn.Sequential(*[
-            nn.Conv1d(gin_channels, gin_channels, kernel_size=s * 2, stride=s, padding=s // 2)
-            for i, s in enumerate(strides)
-        ])
+        self.g_pre_net = nn.Sequential(
+            *[
+                nn.Conv1d(
+                    gin_channels,
+                    gin_channels,
+                    kernel_size=s * 2,
+                    stride=s,
+                    padding=s // 2,
+                )
+                for s in strides
+            ]
+        )
         self.encoder = FVAEEncoder(in_out_channels, hidden_channels, hidden_channels, kernel_size,
                                    enc_n_layers, gin_channels, strides=strides)
         # if use_prior_glow:
@@ -194,7 +202,7 @@ class VQVAEModel(nn.Module):
     
     def num_params(self, model, print_out=True, model_name="model"):
         parameters = filter(lambda p: p.requires_grad, model.parameters())
-        parameters = sum([np.prod(p.size()) for p in parameters]) / 1_000_000
+        parameters = sum(np.prod(p.size()) for p in parameters) / 1_000_000
         if print_out:
             print(f'| {model_name} Trainable Parameters: %.3fM' % parameters)
         return parameters

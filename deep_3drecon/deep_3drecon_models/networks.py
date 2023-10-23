@@ -25,12 +25,7 @@ def resize_n_crop(image, M, dsize=112):
     return warp_affine(image, M, dsize=(dsize, dsize))
 
 def filter_state_dict(state_dict, remove_name='fc'):
-    new_state_dict = {}
-    for key in state_dict:
-        if remove_name in key:
-            continue
-        new_state_dict[key] = state_dict[key]
-    return new_state_dict
+    return {key: state_dict[key] for key in state_dict if remove_name not in key}
 
 def get_scheduler(optimizer, opt):
     """Return a learning rate scheduler
@@ -79,7 +74,7 @@ class ReconNetWrapper(nn.Module):
         if init_path and os.path.isfile(init_path):
             state_dict = filter_state_dict(torch.load(init_path, map_location='cpu'))
             backbone.load_state_dict(state_dict)
-            print("loading init net_recon %s from %s" %(net_recon, init_path))
+            print(f"loading init net_recon {net_recon} from {init_path}")
         self.backbone = backbone
         if not use_last_fc:
             self.final_layers = nn.ModuleList([
@@ -98,9 +93,7 @@ class ReconNetWrapper(nn.Module):
     def forward(self, x):
         x = self.backbone(x)
         if not self.use_last_fc:
-            output = []
-            for layer in self.final_layers:
-                output.append(layer(x))
+            output = [layer(x) for layer in self.final_layers]
             x = torch.flatten(torch.cat(output, dim=1), 1)
         return x
 
@@ -112,7 +105,7 @@ class RecogNetWrapper(nn.Module):
         if pretrained_path:
             state_dict = torch.load(pretrained_path, map_location='cpu')
             net.load_state_dict(state_dict)
-            print("loading pretrained net_recog %s from %s" %(net_recog, pretrained_path))
+            print(f"loading pretrained net_recog {net_recog} from {pretrained_path}")
         for param in net.parameters():
             param.requires_grad = False
         self.net = net
@@ -121,8 +114,7 @@ class RecogNetWrapper(nn.Module):
         
     def forward(self, image, M):
         image = self.preprocess(resize_n_crop(image, M, self.input_size))
-        id_feature = F.normalize(self.net(image), dim=-1, p=2)
-        return id_feature
+        return F.normalize(self.net(image), dim=-1, p=2)
 
 
 # adapted from https://github.com/pytorch/vision/edit/master/torchvision/models/resnet.py
@@ -288,8 +280,9 @@ class ResNet(nn.Module):
             # the 2x2 stride with a dilated convolution instead
             replace_stride_with_dilation = [False, False, False]
         if len(replace_stride_with_dilation) != 3:
-            raise ValueError("replace_stride_with_dilation should be None "
-                             "or a 3-element tuple, got {}".format(replace_stride_with_dilation))
+            raise ValueError(
+                f"replace_stride_with_dilation should be None or a 3-element tuple, got {replace_stride_with_dilation}"
+            )
         self.use_last_fc = use_last_fc
         self.groups = groups
         self.base_width = width_per_group
@@ -306,7 +299,7 @@ class ResNet(nn.Module):
         self.layer4 = self._make_layer(block, 512, layers[3], stride=2,
                                        dilate=replace_stride_with_dilation[2])
         self.avgpool = nn.AdaptiveAvgPool2d((1, 1))
-        
+
         if self.use_last_fc:
             self.fc = nn.Linear(512 * block.expansion, num_classes)
 
@@ -343,15 +336,30 @@ class ResNet(nn.Module):
                 norm_layer(planes * block.expansion),
             )
 
-        layers = []
-        layers.append(block(self.inplanes, planes, stride, downsample, self.groups,
-                            self.base_width, previous_dilation, norm_layer))
+        layers = [
+            block(
+                self.inplanes,
+                planes,
+                stride,
+                downsample,
+                self.groups,
+                self.base_width,
+                previous_dilation,
+                norm_layer,
+            )
+        ]
         self.inplanes = planes * block.expansion
-        for _ in range(1, blocks):
-            layers.append(block(self.inplanes, planes, groups=self.groups,
-                                base_width=self.base_width, dilation=self.dilation,
-                                norm_layer=norm_layer))
-
+        layers.extend(
+            block(
+                self.inplanes,
+                planes,
+                groups=self.groups,
+                base_width=self.base_width,
+                dilation=self.dilation,
+                norm_layer=norm_layer,
+            )
+            for _ in range(1, blocks)
+        )
         return nn.Sequential(*layers)
 
     def _forward_impl(self, x: Tensor) -> Tensor:

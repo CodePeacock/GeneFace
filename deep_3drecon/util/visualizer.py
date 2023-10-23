@@ -31,7 +31,7 @@ def save_images(webpage, visuals, image_path, aspect_ratio=1.0, width=256):
 
     for label, im_data in visuals.items():
         im = util.tensor2im(im_data)
-        image_name = '%s/%s.png' % (label, name)
+        image_name = f'{label}/{name}.png'
         os.makedirs(os.path.join(image_dir, label), exist_ok=True)
         save_path = os.path.join(image_dir, image_name)
         util.save_image(im, save_path, aspect_ratio=aspect_ratio)
@@ -66,7 +66,7 @@ class Visualizer():
         if self.use_html:  # create an HTML object at <checkpoints_dir>/web/; images will be saved under <checkpoints_dir>/web/images/
             self.web_dir = os.path.join(opt.checkpoints_dir, opt.name, 'web')
             self.img_dir = os.path.join(self.web_dir, 'images')
-            print('create web directory %s...' % self.web_dir)
+            print(f'create web directory {self.web_dir}...')
             util.mkdirs([self.web_dir, self.img_dir])
         # create a logging file to store training losses
         self.log_name = os.path.join(opt.checkpoints_dir, opt.name, 'loss_log.txt')
@@ -100,7 +100,7 @@ class Visualizer():
                 util.save_image(image_numpy, img_path)
 
             # update website
-            webpage = html.HTML(self.web_dir, 'Experiment name = %s' % self.name, refresh=0)
+            webpage = html.HTML(self.web_dir, f'Experiment name = {self.name}', refresh=0)
             for n in range(epoch, 0, -1):
                 webpage.add_header('epoch [%d]' % n)
                 ims, txts, links = [], [], []
@@ -182,7 +182,7 @@ class MyVisualizer:
             dataset (str) - - 'train' or 'val' or 'test'
         """
         # if (not add_image) and (not save_results): return
-        
+
         for label, image in visuals.items():
             for i in range(image.shape[0]):
                 image_numpy = util.tensor2im(image[i])
@@ -196,7 +196,7 @@ class MyVisualizer:
                         os.makedirs(save_path)
 
                     if name is not None:
-                        img_path = os.path.join(save_path, '%s.png' % name)
+                        img_path = os.path.join(save_path, f'{name}.png')
                     else:
                         img_path = os.path.join(save_path, '%s_%03d.png' % (label, i + count))
                     util.save_image(image_numpy, img_path)
@@ -204,7 +204,7 @@ class MyVisualizer:
 
     def plot_current_losses(self, total_iters, losses, dataset='train'):
         for name, value in losses.items():
-            self.writer.add_scalar(name + '/%s'%dataset, value, total_iters)
+            self.writer.add_scalar(f'{name}/{dataset}', value, total_iters)
 
     # losses: same format as |losses| of plot_current_losses
     def print_current_losses(self, epoch, iters, losses, t_comp, t_data, dataset='train'):

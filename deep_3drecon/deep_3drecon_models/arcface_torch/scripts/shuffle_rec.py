@@ -29,14 +29,14 @@ def read_worker(args, q_in):
 
 def write_worker(args, q_out):
     pre_time = time.time()
-    
+
     if args.input[-1] == '/':
         args.input = args.input[:-1]
     dirname = os.path.dirname(args.input)
     basename = os.path.basename(args.input)
     output = os.path.join(dirname, f"shuffled_{basename}")
     os.makedirs(output, exist_ok=True)
-    
+
     path_imgidx = os.path.join(output, "train.idx")
     path_imgrec = os.path.join(output, "train.rec")
     save_record = mx.recordio.MXIndexedRecordIO(path_imgidx, path_imgrec, "w")
@@ -49,11 +49,7 @@ def write_worker(args, q_out):
         else:
             header, jpeg = mx.recordio.unpack(deq)
             # TODO it is currently not fully developed
-            if isinstance(header.label, float):
-                label = header.label
-            else:
-                label = header.label[0]
-
+            label = header.label if isinstance(header.label, float) else header.label[0]
             header = mx.recordio.IRHeader(flag=header.flag, label=label, id=header.id, id2=header.id2)
             save_record.write_idx(count, mx.recordio.pack(header, jpeg))
             count += 1

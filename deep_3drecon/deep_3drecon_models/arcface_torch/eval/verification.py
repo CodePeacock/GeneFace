@@ -179,7 +179,7 @@ def calculate_val_far(threshold, dist, actual_issame):
 def evaluate(embeddings, actual_issame, nrof_folds=10, pca=0):
     # Calculate evaluation metrics
     thresholds = np.arange(0, 4, 0.01)
-    embeddings1 = embeddings[0::2]
+    embeddings1 = embeddings[::2]
     embeddings2 = embeddings[1::2]
     tpr, fpr, accuracy = calculate_roc(thresholds,
                                        embeddings1,
@@ -205,7 +205,7 @@ def load_bin(path, image_size):
         with open(path, 'rb') as f:
             bins, issame_list = pickle.load(f, encoding='bytes')  # py3
     data_list = []
-    for flip in [0, 1]:
+    for _ in [0, 1]:
         data = torch.empty((len(issame_list) * 2, 3, image_size[0], image_size[1]))
         data_list.append(data)
     for idx in range(len(issame_list) * 2):

@@ -77,10 +77,6 @@ def load_processed_data(processed_dir):
     coeff_npy_name = os.path.join(processed_dir, "vid_coeff.npy")
     hubert_npy_name = os.path.join(processed_dir, "aud_hubert.npy")
     mel_f0_npy_name = os.path.join(processed_dir, "aud_mel_f0.npy")
-    
-    # required by RAD-NeRF
-
-    ret_dict = {}
 
     print("loading deepspeech ...")
     deepspeech_features = np.load(deepspeech_npy_name)
@@ -88,7 +84,7 @@ def load_processed_data(processed_dir):
     esperanto_features = np.load(esperanto_npy_name)
     print("loading hubert ...")
     hubert_features = np.load(hubert_npy_name)
-    ret_dict['hubert'] = hubert_features
+    ret_dict = {'hubert': hubert_features}
     print("loading Mel and F0 ...")
     mel_f0_features = np.load(mel_f0_npy_name, allow_pickle=True).tolist()
     ret_dict['mel'] = mel_f0_features['mel']
@@ -97,13 +93,13 @@ def load_processed_data(processed_dir):
     print("loading 3dmm coeff ...")
     coeff_dict = np.load(coeff_npy_name, allow_pickle=True).tolist()
     coeff_arr = coeff_dict['coeff'][:]
-    
+
     identity_arr = coeff_arr[:, 0:80]
     exp_arr = coeff_arr[:, 80:144]
 
     print("calculating lm3d ...")
     idexp_lm3d_arr = face3d_helper.reconstruct_idexp_lm3d(torch.from_numpy(identity_arr), torch.from_numpy(exp_arr)).cpu().numpy()
-    
+
     video_idexp_lm3d_mean = idexp_lm3d_arr.mean(axis=0).reshape([1,68,3])
     video_idexp_lm3d_std = idexp_lm3d_arr.std(axis=0).reshape([1,68,3])
     ret_dict['idexp_lm3d_mean'] = video_idexp_lm3d_mean
@@ -148,7 +144,7 @@ def load_processed_data(processed_dir):
         # hubert_win_lst.append(hubert_win)
     idexp_lm3d_normalized_wins_arr = np.stack(idexp_lm3d_normalized_win_lst, axis=0) # [T, t_w, 204]
     # hubert_win_arr = np.stack(hubert_win_lst, axis=0) # [T, t_w, 204]
-   
+
     # obtaining train samples
     train_samples = []
     for i_frame, frame in tqdm.tqdm(enumerate(train_meta['frames']), desc="Binarizing train set", total=len(train_meta['frames'])):
@@ -159,7 +155,7 @@ def load_processed_data(processed_dir):
         torso_img_fname = os.path.join(torso_img_dir,f"{idx}.png")
         gt_img_fname = os.path.join(gt_img_dir,f"{idx}.jpg")
         parsing_fname = os.path.join(parsing_dir,f"{idx}.png")
-        
+
         camera2world_matrix = np.array(frame['transform_matrix'])
         euler, trans = c2w_to_euler_trans(camera2world_matrix)
         face_rect = np.array(frame['face_rect'])
@@ -199,7 +195,7 @@ def load_processed_data(processed_dir):
         }
         train_samples.append(sample)
     ret_dict['train_samples'] = train_samples
-    
+
     # obtaining val samples
     val_samples = []
     for i_frame, frame in tqdm.tqdm(enumerate(val_meta['frames']), desc="Binarizing val set", total=len(val_meta['frames'])):
@@ -210,13 +206,13 @@ def load_processed_data(processed_dir):
         torso_img_fname = os.path.join(torso_img_dir,f"{idx}.png")
         gt_img_fname = os.path.join(gt_img_dir,f"{idx}.jpg")
         parsing_fname = os.path.join(parsing_dir,f"{idx}.png")
-        
+
         face_rect = np.array(frame['face_rect'])
         camera2world_matrix = np.array(frame['transform_matrix'])
         euler, trans = c2w_to_euler_trans(camera2world_matrix)
         deepspeech_wins = get_win_conds(deepspeech_features, idx, smo_win_size=audio_smo_win_size, pad_option='zero')
         esperanto_wins = get_win_conds(esperanto_features, idx, smo_win_size=audio_smo_win_size, pad_option='zero')
-        
+
         idexp_lm3d_normalized_win = get_win_conds(idexp_lm3d_arr_normalized, idx, smo_win_size=exp_cond_win_size, pad_option='zero')
         idexp_lm3d_normalized_wins = get_win_conds(idexp_lm3d_normalized_wins_arr, idx, smo_win_size=exp_smo_win_size, pad_option='zero')
 
@@ -249,7 +245,7 @@ def load_processed_data(processed_dir):
             # 'hubert_wins': hubert_wins,
         }
 
-        val_samples.append(sample)    
+        val_samples.append(sample)
     ret_dict['val_samples'] = val_samples
 
     return ret_dict

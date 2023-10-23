@@ -355,5 +355,3 @@ class UNetBackbone(nn.Module):
         return x, x_mask
 
 
-if __name__ == '__main__':
-    pass

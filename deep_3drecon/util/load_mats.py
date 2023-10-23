@@ -10,15 +10,13 @@ import os.path as osp
 # load expression basis
 def LoadExpBasis(bfm_folder='BFM'):
     n_vertex = 53215
-    Expbin = open(osp.join(bfm_folder, 'Exp_Pca.bin'), 'rb')
-    exp_dim = array('i')
-    exp_dim.fromfile(Expbin, 1)
-    expMU = array('f')
-    expPC = array('f')
-    expMU.fromfile(Expbin, 3*n_vertex)
-    expPC.fromfile(Expbin, 3*exp_dim[0]*n_vertex)
-    Expbin.close()
-
+    with open(osp.join(bfm_folder, 'Exp_Pca.bin'), 'rb') as Expbin:
+        exp_dim = array('i')
+        exp_dim.fromfile(Expbin, 1)
+        expMU = array('f')
+        expPC = array('f')
+        expMU.fromfile(Expbin, 3*n_vertex)
+        expPC.fromfile(Expbin, 3*exp_dim[0]*n_vertex)
     expPC = np.array(expPC)
     expPC = np.reshape(expPC, [exp_dim[0], -1])
     expPC = np.transpose(expPC)

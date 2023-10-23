@@ -186,8 +186,13 @@ class ADNeRFTorsoTask(ADNeRFTask):
         #######################
         loss_output, model_out = self.run_model(sample, infer=False, run_head_mode=False)
         def mse2psnr(x): return -10. * torch.log(x) / torch.log(torch.Tensor([10.])).to(x.device)
+
         loss_output['torso_psnr'] = mse2psnr(loss_output['com_mse_loss'].detach())
-        total_loss = sum([loss_weights.get(k, 1) * v for k, v in loss_output.items() if isinstance(v, torch.Tensor) and v.requires_grad])
+        total_loss = sum(
+            loss_weights.get(k, 1) * v
+            for k, v in loss_output.items()
+            if isinstance(v, torch.Tensor) and v.requires_grad
+        )
         return total_loss, loss_output
 
     def on_before_optimization(self, opt_idx):
@@ -203,14 +208,13 @@ class ADNeRFTorsoTask(ADNeRFTask):
     @torch.no_grad()
     def validation_step(self, sample, batch_idx):
         sample['c2w_t0'] = convert_to_tensor(self.train_dataset.samples[0]['c2w'][:3]).float().to(sample['c2w'].device)
-        outputs = {}
-        outputs['losses'] = {}
+        outputs = {'losses': {}}
         outputs['losses'], model_out = self.run_model(sample, infer=False, run_head_mode=False)
         outputs['total_loss'] = sum(outputs['losses'].values())
         outputs['nsamples'] = 1
         outputs = tensors_to_scalars(outputs)
         if self.global_step % hparams['valid_infer_interval'] == 0 \
-                and batch_idx < hparams['num_valid_plots']:
+                    and batch_idx < hparams['num_valid_plots']:
             idx_interval = (len(self.val_dataset)-1)//(hparams['num_valid_plots']-1)
             idx_lst = [i_plot*idx_interval for i_plot in range(hparams['num_valid_plots'])]
             sample = move_to_cuda(self.val_dataset[idx_lst[batch_idx]])

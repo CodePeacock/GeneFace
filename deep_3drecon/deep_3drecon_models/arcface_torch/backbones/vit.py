@@ -186,11 +186,11 @@ class VisionTransformer(nn.Module):
         for _block in self.blocks:
             self.extra_gflops += _block.extra_gflops
 
-        if norm_layer == "ln":
-            self.norm = nn.LayerNorm(embed_dim)
-        elif norm_layer == "bn":
+        if norm_layer == "bn":
             self.norm = VITBatchNorm(self.num_patches)
 
+        elif norm_layer == "ln":
+            self.norm = nn.LayerNorm(embed_dim)
         # features head
         self.feature = nn.Sequential(
             nn.Linear(in_features=embed_dim * num_patches, out_features=embed_dim, bias=False),

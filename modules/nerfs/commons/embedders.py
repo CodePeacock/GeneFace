@@ -31,8 +31,10 @@ class FreqEmbedder(nn.Module):
             freq_bands = torch.linspace(2.**0, 2. ** self.max_freq_log2, steps=self.num_freqs)
 
         for freq in freq_bands:
-            for p_fn in self.periodic_fns:
-                self.embed_fns.append(lambda x, p_fn=p_fn,freq=freq: p_fn(x * freq)) # e.g., torch.cos(x*(2^5))
+            self.embed_fns.extend(
+                lambda x, p_fn=p_fn, freq=freq: p_fn(x * freq)
+                for p_fn in self.periodic_fns
+            )
         self.num_embed_fns = len(self.embed_fns)
 
     def forward(self, x):
@@ -41,5 +43,4 @@ class FreqEmbedder(nn.Module):
         embedding: [..., out_dim]; the corresponding frequency encoding
         """
         embed_lst = [embed_fn(x) for embed_fn in self.embed_fns] # [list of [..., in_dim]]
-        embedding = torch.cat(embed_lst, dim=-1) # [..., out_dim]
-        return embedding
+        return torch.cat(embed_lst, dim=-1)
